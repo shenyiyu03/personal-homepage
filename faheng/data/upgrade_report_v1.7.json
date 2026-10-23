@@ -1,0 +1,10 @@
+{
+  "version": "v1.7",
+  "upgrade": "annotation platform UI",
+  "changes": [
+    "新增任务池工作台",
+    "新增任务搜索入口",
+    "新增标注进度看板",
+    "保留原双人复核逻辑"
+  ]
+}

@@ -1,0 +1,4013 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>法衡｜法答网 Benchmark 110 条双人复核任务池</title>
+  <style>
+    :root {
+      --bg: #081011;
+      --surface: #10191a;
+      --surface-2: #152021;
+      --surface-3: #1a2829;
+      --line: #283637;
+      --line-strong: #3a4b4c;
+      --text: #edf4f1;
+      --muted: #91a29e;
+      --faint: #657572;
+      --jade: #43dda0;
+      --jade-2: #a5f3d0;
+      --jade-soft: rgba(67, 221, 160, .11);
+      --amber: #d9a54b;
+      --amber-soft: rgba(217, 165, 75, .12);
+      --red: #e77979;
+      --red-soft: rgba(231, 121, 121, .12);
+      --shadow: 0 18px 55px rgba(0, 0, 0, .28);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--bg); scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 72% -20%, rgba(44, 115, 91, .16), transparent 36%),
+        linear-gradient(180deg, #071011 0, var(--bg) 100%);
+      font-family: Inter, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: 2px solid var(--jade);
+      outline-offset: 2px;
+    }
+
+    .topbar {
+      height: 58px;
+      padding: 0 18px;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: rgba(7, 15, 16, .94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      white-space: nowrap;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      color: #062016;
+      background: var(--jade);
+      border-radius: 9px;
+      font-weight: 900;
+      font-size: 16px;
+      box-shadow: 0 0 28px rgba(67, 221, 160, .18);
+    }
+
+    .brand strong { font-size: 17px; letter-spacing: .08em; }
+    .brand span { color: var(--faint); font-size: 12px; }
+    .divider { width: 1px; height: 26px; background: var(--line); }
+
+    .task-heading { min-width: 0; flex: 1; }
+    .task-heading b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .task-heading small { color: var(--muted); }
+
+    .progress-wrap {
+      width: min(240px, 22vw);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .progress-track {
+      flex: 1;
+      height: 5px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: #263132;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 10%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #25b87b, var(--jade));
+      transition: width .24s ease;
+    }
+
+    .progress-text { color: var(--jade-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+    .header-actions { display: flex; gap: 8px; }
+    .icon-btn, .ghost-btn, .outline-btn, .primary-btn {
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background: transparent;
+      cursor: pointer;
+      transition: .15s ease;
+    }
+
+    .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; }
+    .icon-btn:hover, .ghost-btn:hover, .outline-btn:hover { border-color: var(--jade); background: var(--jade-soft); }
+
+    .context {
+      margin: 10px 12px 0;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #c8d5d1;
+      background: linear-gradient(90deg, rgba(67, 221, 160, .08), rgba(67, 221, 160, .025));
+      border: 1px solid rgba(67, 221, 160, .2);
+      border-radius: 10px;
+    }
+
+    .context .dot { width: 8px; height: 8px; background: var(--jade); border-radius: 50%; box-shadow: 0 0 12px var(--jade); }
+    .context strong { color: var(--jade-2); }
+    .context small { margin-left: auto; color: var(--muted); white-space: nowrap; }
+
+    .workspace {
+      min-height: calc(100vh - 130px);
+      padding: 10px 12px 94px;
+      display: grid;
+      grid-template-columns: minmax(260px, 28%) minmax(420px, 44%) minmax(290px, 28%);
+      gap: 10px;
+    }
+
+    .panel {
+      min-width: 0;
+      background: linear-gradient(180deg, rgba(20, 31, 32, .96), rgba(13, 23, 24, .96));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      min-height: 52px;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-head h2 { margin: 0; font-size: 17px; letter-spacing: .03em; }
+    .panel-head .meta { color: var(--muted); font-size: 12px; }
+    .panel-body { padding: 12px; }
+
+    .task-switch {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .task-switch select, .task-switch button, .note-area, .search {
+      color: var(--text);
+      background: #0c1516;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .task-switch select { width: 100%; min-width: 0; padding: 8px 9px; }
+    .task-switch button { width: 36px; cursor: pointer; }
+
+    .section-card {
+      margin-bottom: 10px;
+      padding: 14px;
+      background: rgba(25, 38, 39, .72);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+    }
+
+    .section-title {
+      margin: 0 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+
+    .section-title::before {
+      content: "";
+      width: 3px;
+      height: 15px;
+      border-radius: 3px;
+      background: var(--jade);
+    }
+
+    .facts { margin: 0; color: #d8e1de; }
+    .facts strong { color: var(--jade-2); font-weight: 600; }
+
+    .case-meta {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .meta-cell { padding: 8px 9px; background: rgba(8, 16, 17, .52); border-radius: 7px; }
+    .meta-cell span { display: block; color: var(--faint); font-size: 11px; }
+    .meta-cell b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+
+    .evidence-toolbar { display: flex; gap: 6px; margin-bottom: 9px; flex-wrap: wrap; }
+    .chip, .tag {
+      padding: 4px 9px;
+      color: var(--muted);
+      background: #101a1b;
+      border: 1px solid var(--line);
+      border-radius: 99px;
+      cursor: pointer;
+      transition: .13s ease;
+    }
+
+    .chip.active, .chip:hover, .tag.active, .tag:hover {
+      color: var(--jade-2);
+      background: var(--jade-soft);
+      border-color: rgba(67, 221, 160, .55);
+    }
+
+    .evidence-list { display: grid; gap: 7px; }
+    .evidence {
+      width: 100%;
+      padding: 10px;
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      text-align: left;
+      color: inherit;
+      background: #101a1b;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .evidence:hover, .evidence.active { border-color: var(--jade); background: var(--jade-soft); }
+    .evidence-num {
+      width: 26px;
+      height: 26px;
+      display: grid;
+      place-items: center;
+      color: var(--jade-2);
+      background: #183029;
+      border-radius: 7px;
+      font-weight: 700;
+    }
+
+    .evidence b { display: block; font-size: 13px; }
+    .evidence small { color: var(--faint); }
+    .status { color: var(--jade); font-size: 11px; }
+
+    .issue-list { margin: 0; padding-left: 20px; color: #d5dfdc; }
+    .issue-list li + li { margin-top: 7px; }
+
+    .article { padding: 16px 18px 24px; }
+    .article section { padding: 2px 0 14px; border-bottom: 1px solid var(--line); }
+    .article section:last-child { border-bottom: 0; }
+    .article h3 { margin: 14px 0 7px; font-size: 15px; }
+    .article p { margin: 0 0 8px; color: #d6dfdc; }
+
+    .law-chip {
+      display: inline-flex;
+      margin: 2px 5px 4px 0;
+      padding: 4px 8px;
+      color: var(--jade-2);
+      background: var(--jade-soft);
+      border: 1px solid rgba(67, 221, 160, .24);
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .reason-step {
+      margin: 10px 0;
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 10px;
+    }
+
+    .step-no {
+      width: 22px; height: 22px;
+      display: grid; place-items: center;
+      color: var(--jade-2);
+      background: #173329;
+      border: 1px solid rgba(67, 221, 160, .35);
+      border-radius: 50%;
+      font-size: 12px;
+    }
+
+    .e-ref {
+      padding: 1px 5px;
+      color: var(--jade-2);
+      background: rgba(67, 221, 160, .1);
+      border: 1px solid rgba(67, 221, 160, .25);
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .risk {
+      margin: 12px 0;
+      padding: 11px 12px;
+      display: flex;
+      gap: 9px;
+      color: #f0d9ab;
+      background: var(--amber-soft);
+      border: 1px solid rgba(217, 165, 75, .5);
+      border-radius: 8px;
+    }
+
+    .risk strong { color: var(--amber); white-space: nowrap; }
+    .flash { animation: flash .8s ease; }
+    @keyframes flash {
+      0%, 100% { box-shadow: none; }
+      35% { box-shadow: 0 0 0 2px var(--jade), 0 0 28px rgba(67, 221, 160, .24); }
+    }
+
+    .score-summary {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 12px;
+      align-items: center;
+      margin: 2px 0 12px;
+    }
+
+    .score-ring {
+      width: 88px; height: 88px;
+      display: grid; place-items: center;
+      border-radius: 50%;
+      background: conic-gradient(var(--jade) var(--score-angle, 0deg), #223031 0);
+      position: relative;
+    }
+
+    .score-ring::before {
+      content: "";
+      position: absolute;
+      inset: 7px;
+      background: var(--surface);
+      border-radius: 50%;
+    }
+
+    .score-ring b { position: relative; font-size: 25px; line-height: 1; font-variant-numeric: tabular-nums; }
+    .score-ring small { display: block; position: relative; color: var(--muted); }
+    .summary-copy b { color: var(--jade-2); font-size: 16px; }
+    .summary-copy p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+
+    .dimension { padding: 12px 0; border-top: 1px solid var(--line); }
+    .dimension:first-of-type { border-top: 0; }
+    .dimension-head { display: flex; justify-content: space-between; gap: 10px; }
+    .dimension-head b { font-size: 13px; }
+    .dimension-head span { color: var(--jade); font-size: 12px; }
+    .dimension p { margin: 2px 0 8px; color: var(--faint); font-size: 11px; }
+    .scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+    .scale button {
+      height: 32px;
+      color: #bdc9c5;
+      background: #172223;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .scale button:hover { border-color: var(--jade); }
+    .scale button.selected {
+      color: #062016;
+      background: var(--jade);
+      border-color: var(--jade);
+      font-weight: 800;
+      box-shadow: 0 0 16px rgba(67, 221, 160, .16);
+    }
+
+    .scale button.low.selected { color: #2a140c; background: var(--amber); border-color: var(--amber); }
+    .validation { display: none; margin-top: 6px; color: var(--amber); font-size: 11px; }
+    .validation.show { display: block; }
+
+    .note-area {
+      width: 100%;
+      min-height: 108px;
+      padding: 10px;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    .note-meta { margin-top: 4px; display: flex; justify-content: space-between; color: var(--faint); font-size: 11px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .tag { border-radius: 6px; }
+    .tag.alert.active { color: #f2d7a4; background: var(--amber-soft); border-color: var(--amber); }
+
+    .footer-actions {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      z-index: 15;
+      min-height: 78px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      background: rgba(8, 16, 17, .96);
+      border-top: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+
+    .save-status { margin-right: auto; color: var(--muted); }
+    .ghost-btn, .outline-btn, .primary-btn { min-height: 42px; padding: 0 20px; }
+    .primary-btn {
+      min-width: 190px;
+      color: #062016;
+      background: linear-gradient(135deg, #45dfa2, #37c98d);
+      border-color: var(--jade);
+      font-weight: 800;
+      box-shadow: 0 8px 26px rgba(67, 221, 160, .15);
+    }
+
+    .primary-btn:hover { filter: brightness(1.06); transform: translateY(-1px); }
+    .primary-btn:disabled { cursor: not-allowed; filter: grayscale(.8); opacity: .42; transform: none; }
+    .outline-btn { color: var(--jade-2); }
+
+    .toast {
+      position: fixed;
+      left: 50%; bottom: 96px;
+      z-index: 50;
+      padding: 10px 16px;
+      color: #062016;
+      background: var(--jade-2);
+      border-radius: 8px;
+      font-weight: 700;
+      box-shadow: var(--shadow);
+      transform: translate(-50%, 18px);
+      opacity: 0;
+      pointer-events: none;
+      transition: .2s ease;
+    }
+    .toast.show { transform: translate(-50%, 0); opacity: 1; }
+
+    dialog {
+      width: min(780px, calc(100vw - 28px));
+      color: var(--text);
+      background: #111b1c;
+      border: 1px solid var(--line-strong);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+    }
+    dialog::backdrop { background: rgba(0, 0, 0, .72); backdrop-filter: blur(3px); }
+    .dialog-head { display: flex; align-items: center; justify-content: space-between; }
+    .dialog-head h2 { margin: 0; }
+    .metrics { margin: 18px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .metric { padding: 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; }
+    .metric b { display: block; color: var(--jade-2); font-size: 24px; }
+    .metric span { color: var(--muted); font-size: 12px; }
+    .dataset-list { max-height: 330px; overflow: auto; border-top: 1px solid var(--line); }
+    .dataset-row { padding: 10px 4px; display: grid; grid-template-columns: 84px 1fr 100px; gap: 10px; border-bottom: 1px solid var(--line); }
+    .dataset-row code { color: var(--jade-2); }
+    .dataset-row small { color: var(--muted); }
+
+    /* 新增：语料管理对话框（添加表单 + JSON 导入） */
+    .corp-dialog { width: min(880px, calc(100vw - 28px)); max-height: calc(100vh - 56px); }
+    .corp-dialog form { display: flex; flex-direction: column; max-height: calc(100vh - 180px); }
+    .corp-scroll { padding: 6px 4px 14px; overflow: auto; max-height: 56vh; }
+    .corp-scroll section { padding: 0 2px 14px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+    .corp-scroll section:last-of-type { border-bottom: 0; margin-bottom: 0; }
+    .corp-scroll h3 {
+      margin: 0 0 10px; font-size: 13px; color: var(--jade-2);
+      display: flex; align-items: center; gap: 8px; letter-spacing: .03em;
+    }
+    .corp-scroll h3::before {
+      content: ""; width: 3px; height: 14px; border-radius: 3px; background: var(--jade);
+    }
+    .corp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .corp-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .corp-grid.cols-1 { grid-template-columns: 1fr; }
+    .corp-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .corp-field.cols-span-2 { grid-column: span 2; }
+    .corp-field.cols-span-3 { grid-column: span 3; }
+    .corp-field label {
+      color: var(--faint); font-size: 11px; letter-spacing: .04em;
+    }
+    .corp-field label em { color: var(--red); font-style: normal; margin-left: 2px; }
+    .corp-field input, .corp-field select, .corp-field textarea {
+      width: 100%; min-width: 0; color: var(--text);
+      background: #0c1516; border: 1px solid var(--line);
+      border-radius: 8px; padding: 8px 10px; font: inherit;
+    }
+    .corp-field input:focus, .corp-field select:focus, .corp-field textarea:focus {
+      border-color: var(--jade); outline: 1px solid rgba(67, 221, 160, .35); outline-offset: 0;
+    }
+    .corp-field textarea { resize: vertical; line-height: 1.55; min-height: 72px; }
+    .corp-field .hint { color: var(--faint); font-size: 11px; }
+    .corp-error {
+      margin: 0 0 10px; padding: 9px 11px;
+      color: #f0c6c6; background: var(--red-soft);
+      border: 1px solid rgba(231, 121, 121, .42);
+      border-radius: 8px; font-size: 12px;
+    }
+    .corp-error:empty { display: none; }
+    .corp-foot {
+      padding: 12px 0 0; display: flex; gap: 10px; align-items: center; justify-content: flex-end;
+      border-top: 1px solid var(--line); margin-top: 4px;
+    }
+    .corp-foot .left { margin-right: auto; color: var(--faint); font-size: 11px; }
+    .corp-foot .primary-btn { min-width: 168px; }
+    .corp-foot .ghost-btn { color: var(--muted); }
+    .corp-tabs { display: flex; gap: 6px; padding: 0 0 12px; }
+    .corp-tab {
+      padding: 6px 12px; color: var(--muted);
+      background: #101a1b; border: 1px solid var(--line);
+      border-radius: 99px; cursor: pointer; font-size: 12px;
+    }
+    .corp-tab.active { color: var(--jade-2); background: var(--jade-soft); border-color: rgba(67, 221, 160, .55); }
+    .corp-tab-panel { display: none; }
+    .corp-tab-panel.active { display: block; }
+    .corp-json-area { width: 100%; min-height: 280px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+    .corp-stat {
+      margin: 0 0 12px; padding: 10px 12px;
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px;
+    }
+    .corp-stat b { color: var(--jade-2); font-size: 16px; font-variant-numeric: tabular-nums; }
+    .corp-stat span { display: block; color: var(--muted); font-size: 11px; }
+    .corp-custom-tag {
+      display: inline-block; margin-left: 6px; padding: 1px 6px;
+      color: #062016; background: var(--jade); border-radius: 5px;
+      font-size: 10px; font-weight: 700; letter-spacing: .04em; vertical-align: 2px;
+    }
+    .corp-custom-row { background: rgba(67, 221, 160, .04); }
+    .corp-empty {
+      margin: 8px 0; padding: 24px; text-align: center; color: var(--muted);
+      background: var(--surface-2); border: 1px dashed var(--line-strong); border-radius: 9px;
+    }
+
+    @media (max-width: 1150px) {
+      .workspace { grid-template-columns: minmax(260px, 34%) 1fr; }
+      .panel.score-panel { grid-column: 1 / -1; }
+      .score-panel .panel-body { display: grid; grid-template-columns: 180px 1fr 1fr; gap: 16px; }
+      .progress-wrap { display: none; }
+    }
+
+    @media (max-width: 760px) {
+      .topbar { padding: 0 10px; gap: 10px; }
+      .brand span, .divider, .header-actions { display: none; }
+      .context { align-items: flex-start; }
+      .context small { display: none; }
+      .workspace { grid-template-columns: 1fr; padding-inline: 8px; }
+      .score-panel .panel-body { display: block; }
+      .footer-actions { padding: 10px; }
+      .save-status { display: none; }
+      .primary-btn { min-width: 150px; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .dataset-row { grid-template-columns: 76px 1fr; }
+      .dataset-row small { grid-column: 2; }
+      .corp-grid, .corp-grid.cols-3 { grid-template-columns: 1fr; }
+      .corp-field.cols-span-2, .corp-field.cols-span-3 { grid-column: auto; }
+      .corp-stat { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+    }
+  
+    /* 问答 + 候选法条 TXT */
+    .qa-answer {
+      white-space: pre-wrap;
+      line-height: 1.75;
+      color: #d6dfdc;
+    }
+    .law-cards { display: grid; gap: 12px; }
+    .law-card {
+      padding: 13px 14px;
+      background: #0f191a;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      scroll-margin-top: 90px;
+    }
+    .law-card.flash {
+      border-color: var(--jade);
+      box-shadow: 0 0 0 2px rgba(67, 221, 160, .12);
+    }
+    .law-card-head {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .law-card-head strong { color: var(--jade-2); }
+    .law-labeler {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .law-labeler-title {
+      color: var(--faint);
+      font-size: 11px;
+      margin-right: 2px;
+    }
+    .law-label-btn {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: #111d1e;
+      color: var(--muted);
+      border-radius: 7px;
+      padding: 4px 8px;
+      font-size: 11px;
+      line-height: 1.2;
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease, color .15s ease, transform .15s ease;
+    }
+    .law-label-btn:hover {
+      color: #eef5f2;
+      border-color: #54706a;
+      transform: translateY(-1px);
+    }
+    .law-label-btn.selected[data-value="0"] {
+      color: #ffd2d2;
+      border-color: rgba(231,121,121,.68);
+      background: rgba(231,121,121,.12);
+    }
+    .law-label-btn.selected[data-value="1"] {
+      color: #f7e4aa;
+      border-color: rgba(232,212,154,.62);
+      background: rgba(232,212,154,.10);
+    }
+    .law-label-btn.selected[data-value="2"] {
+      color: var(--jade-2);
+      border-color: rgba(67,221,160,.62);
+      background: rgba(67,221,160,.10);
+    }
+    .evidence-manual-label {
+      flex: 0 0 auto;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 10px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+    }
+    .evidence-manual-label[data-value="0"] { color: #e4a7a7; }
+    .evidence-manual-label[data-value="1"] { color: #e8d49a; }
+    .evidence-manual-label[data-value="2"] { color: var(--jade-2); }
+    .law-card-title { margin: 0 0 5px; font-size: 13px; color: #e8efed; }
+    .law-card-chapter {
+      margin: 0 0 8px;
+      color: var(--faint);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+    .law-card-content {
+      margin: 0;
+      white-space: pre-wrap;
+      line-height: 1.68;
+      color: #cdd8d5;
+      font-size: 12px;
+    }
+
+    .benchmark-flow {
+      margin: 10px 12px 0;
+      padding: 10px 12px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr auto 1fr;
+      gap: 8px;
+      align-items: center;
+      background: rgba(10, 20, 21, .82);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .flow-step {
+      min-width: 0;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0d1718;
+    }
+    .flow-step b { color: var(--jade); margin-right: 6px; font-size: 11px; }
+    .flow-step span { color: #dce7e3; font-weight: 700; font-size: 12px; }
+    .flow-step small { display:block; margin-top:2px; color:var(--faint); font-size:10px; }
+    .flow-step.active { border-color: rgba(67,221,160,.42); background: var(--jade-soft); }
+    .flow-arrow { color: var(--faint); font-size: 14px; }
+
+    .review-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .review-grid label { display:flex; flex-direction:column; gap:4px; }
+    .review-grid label span { color:var(--faint); font-size:11px; }
+    .review-grid select, .review-grid input {
+      width:100%; color:var(--text); background:#0c1516;
+      border:1px solid var(--line); border-radius:7px; padding:8px;
+    }
+    .review-hint { margin-top:7px; color:var(--faint); font-size:11px; }
+    .review-hint.warn { color:var(--amber); }
+
+    .benchmark-dialog { width:min(980px, calc(100vw - 28px)); }
+    .benchmark-overview {
+      margin-top:16px; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px;
+    }
+    .benchmark-kpi {
+      padding:12px; background:var(--surface-2); border:1px solid var(--line); border-radius:9px;
+    }
+    .benchmark-kpi span { display:block; color:var(--faint); font-size:10px; }
+    .benchmark-kpi b { display:block; margin-top:3px; color:var(--jade-2); font-size:13px; word-break:break-word; }
+    .benchmark-detail { margin-top:12px; max-height:55vh; overflow:auto; }
+    .benchmark-card {
+      margin-bottom:9px; padding:12px; background:#0d1718; border:1px solid var(--line); border-radius:9px;
+    }
+    .benchmark-card h3 { margin:0 0 7px; font-size:13px; color:var(--jade-2); }
+    .benchmark-card p { margin:4px 0; color:#d5dfdc; }
+    .benchmark-card code { color:var(--jade-2); }
+    .status-pill {
+      display:inline-flex; align-items:center; padding:2px 7px; margin:2px 4px 2px 0;
+      border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:10px;
+    }
+    .status-pill.ok { color:var(--jade-2); border-color:rgba(67,221,160,.42); background:var(--jade-soft); }
+    .status-pill.warn { color:#f0d9ab; border-color:rgba(217,165,75,.45); background:var(--amber-soft); }
+    .gold-answer {
+      padding:10px 12px; margin:8px 0; border-left:3px solid var(--jade);
+      background:var(--jade-soft); border-radius:0 7px 7px 0; color:#e6f1ed;
+    }
+    .benchmark-source {
+      padding:10px 12px; margin:8px 0; border:1px solid var(--line); border-radius:8px;
+      background:#0b1415; white-space:pre-wrap; color:#ccd7d4;
+    }
+    @media (max-width: 900px) {
+      .benchmark-flow { grid-template-columns:1fr; }
+      .flow-arrow { display:none; }
+      .benchmark-overview { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .review-grid { grid-template-columns:1fr; }
+    }
+
+
+    .review-grid-second { margin-top:8px; }
+    .review-wide { display:flex; flex-direction:column; gap:4px; margin-top:8px; }
+    .review-wide > span { color:var(--faint); font-size:11px; }
+    .review-wide textarea {
+      width:100%; min-height:58px; resize:vertical; color:var(--text); background:#0c1516;
+      border:1px solid var(--line); border-radius:7px; padding:8px; line-height:1.5;
+    }
+    .gate-checklist {
+      display:grid; gap:6px; margin-top:10px; padding:9px 10px;
+      background:#0b1415; border:1px solid var(--line); border-radius:8px;
+    }
+    .gate-item { display:flex; gap:8px; align-items:flex-start; font-size:11px; color:var(--muted); }
+    .gate-item .gate-dot {
+      width:9px; height:9px; flex:0 0 auto; margin-top:4px; border-radius:50%;
+      background:var(--amber);
+    }
+    .gate-item.pass { color:#d9eee6; }
+    .gate-item.pass .gate-dot { background:var(--jade); box-shadow:0 0 10px rgba(67,221,160,.25); }
+    #gateBadge {
+      padding:2px 7px; border-radius:999px; border:1px solid var(--line);
+      color:var(--muted); font-size:10px;
+    }
+    #gateBadge[data-state="locked"] { color:var(--jade-2); background:var(--jade-soft); border-color:rgba(67,221,160,.45); }
+    #gateBadge[data-state="disputed"] { color:#f0d9ab; background:var(--amber-soft); border-color:rgba(217,165,75,.45); }
+
+
+/* v1.8 layout fixes */
+body {
+  padding-bottom: 0 !important;
+}
+.footer-actions {
+  position: sticky !important;
+  bottom: 0 !important;
+  margin-top: 24px;
+  min-height: 72px !important;
+}
+.main, .workspace, .content, .app {
+  overflow: visible !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+textarea, input {
+  max-height: none !important;
+}
+.note-area {
+  min-height: 160px !important;
+}
+.card, .panel {
+  overflow: visible !important;
+}
+
+</style>
+
+<style id="v21-task-management-style">
+  .task-manage-row {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    margin:-2px 0 12px; padding:8px 10px;
+    border:1px solid var(--line); border-radius:8px;
+    background:rgba(8,16,17,.38); color:var(--muted); font-size:12px;
+  }
+  .task-manage-row b { color:var(--jade-2); word-break:break-all; }
+  .task-manage-actions { display:flex; align-items:center; gap:7px; flex-wrap:wrap; justify-content:flex-end; }
+  .task-restore-btn {
+    flex:0 0 auto; min-height:32px; padding:0 12px; cursor:pointer;
+    color:var(--jade-2); background:rgba(67,221,160,.08);
+    border:1px solid rgba(67,221,160,.42); border-radius:8px;
+  }
+  .task-restore-btn:hover { background:rgba(67,221,160,.16); border-color:rgba(67,221,160,.72); }
+  .task-restore-btn:disabled { opacity:.45; cursor:not-allowed; }
+  .task-delete-btn {
+    flex:0 0 auto; min-height:32px; padding:0 12px; cursor:pointer;
+    color:#ffb3b3; background:rgba(231,121,121,.08);
+    border:1px solid rgba(231,121,121,.55); border-radius:8px;
+  }
+  .task-delete-btn:hover {
+    color:#fff; background:rgba(231,121,121,.18);
+    border-color:rgba(255,145,145,.9);
+  }
+  .task-delete-btn:disabled { opacity:.45; cursor:not-allowed; }
+  #deletedBuiltInCount { color:var(--jade-2); font-weight:700; }
+</style>
+
+
+<style id="v24-preload-banner-fix">
+#preloadBanner{
+  color:#c8d5d1 !important;
+  background:rgba(10,20,21,.88) !important;
+  border-color:#283637 !important;
+  font-family:Inter,"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif !important;
+}
+#preloadBanner b{color:#a5f3d0 !important;}
+</style>
+
+</head>
+<body>
+
+<div id="preloadBanner" style="
+  margin:10px 12px 0;
+  padding:10px 14px;
+  color:#c8d5d1;
+  background:rgba(10,20,21,.88);
+  border:1px solid #283637;
+  border-radius:10px;
+  font-family:Inter,'Noto Sans SC','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+  font-size:13px;
+  line-height:1.6;
+">
+  <b style="color:#a5f3d0">已预装 10 条可标注任务</b>：打开页面即可逐条进行四维评分、问题标签、Reviewer A/B 复核、分歧处理与提交；标注草稿保存在当前浏览器本地。
+</div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">衡</div>
+      <div><strong>法衡</strong><span> · LexAlign</span></div>
+    </div>
+    <div class="divider"></div>
+    <div class="task-heading">
+      <b id="headerTitle">加载任务…</b>
+      <small id="headerMeta">FDW-2026-0031—0140 · 10 条演示任务</small>
+    </div>
+    <div class="progress-wrap">
+      <span class="progress-text" id="progressText">1 / 10</span>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="addTaskBtn" aria-label="添加新语料" title="添加新语料（表单）">＋</button>
+      <button class="icon-btn" id="importTaskBtn" aria-label="导入语料" title="导入语料（TXT）">⇪</button>
+      <button class="icon-btn" id="benchmarkBtn" aria-label="查看 Benchmark 信息" title="Benchmark 对齐信息">B</button>
+      <button class="icon-btn" id="datasetBtn" aria-label="查看数据集" title="当前数据集">▦</button>
+      <button class="icon-btn" id="exportBtn" aria-label="导出标注结果" title="导出结果">⇩</button>
+    </div>
+  </header>
+
+  <div class="context">
+    <span class="dot"></span>
+    <div><strong>项目背景</strong>　将法答网专家问答转化为可复核的法律 Benchmark：从生活化题面、争点识别、黄金规范、双源核验到人工审核，形成可追溯的数据生产闭环。</div>
+    <small>10 条已接入 · A/B 双人复核 · 分歧门禁 · 可锁定</small>
+  </div>
+
+
+  <div class="benchmark-flow" aria-label="Benchmark 数据生产流程">
+    <div class="flow-step active"><b>01</b><span>Source QA</span><small>法答网原始问答</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step active"><b>02</b><span>Query</span><small>生活化题面</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step active"><b>03</b><span>Gold</span><small>争点 / 黄金规范</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><b>04</b><span>Verify</span><small>双源 / 时点核验</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><b>05</b><span>Review</span><small>人工复核 / 锁定</small></div>
+  </div>
+
+  <main class="workspace">
+    <aside class="panel">
+      <div class="panel-head"><h2 id="leftPanelTitle">案件事实与证据</h2><span class="meta" id="caseId"></span></div>
+      <div class="panel-body">
+        <div class="task-switch">
+          <button id="prevBtn" aria-label="上一条任务">←</button>
+          <select id="taskSelect" aria-label="切换标注任务"></select>
+          <button id="nextBtn" aria-label="下一条任务">→</button>
+        </div>
+        <div class="task-manage-row">
+          <span>当前任务：<b id="currentTaskManageId">—</b></span>
+          <div class="task-manage-actions">
+            <button type="button" id="quickRestoreTaskBtn" class="task-restore-btn" title="打开误删任务回收站">恢复误删（<span id="quickDeletedCount">0</span>）</button>
+            <button type="button" id="deleteCurrentTaskBtn" class="task-delete-btn" title="从当前工作台删除这条任务">删除当前任务</button>
+          </div>
+        </div>
+
+        <section class="section-card">
+          <h3 class="section-title" id="factsSectionTitle">基本事实</h3>
+          <p class="facts" id="facts"></p>
+          <div class="case-meta" id="caseMeta"></div>
+        </section>
+
+        <section class="section-card">
+          <h3 class="section-title" id="evidenceSectionTitle">证据材料</h3>
+          <div class="evidence-toolbar">
+            <button class="chip active" data-filter="all">全部</button>
+            <button class="chip" data-filter="书证">书证</button>
+            <button class="chip" data-filter="电子数据">电子数据</button>
+            <button class="chip" data-filter="规则文本">规则文本</button>
+          </div>
+          <div class="evidence-list" id="evidenceList"></div>
+        </section>
+
+        <section class="section-card">
+          <h3 class="section-title" id="issuesSectionTitle">核心审查问题</h3>
+          <ol class="issue-list" id="issues"></ol>
+        </section>
+      </div>
+    </aside>
+
+    <article class="panel">
+      <div class="panel-head">
+        <h2 id="analysisPanelTitle">模型生成的法律分析</h2>
+        <span class="meta" id="analysisPanelMeta">引用可追踪 · 论证链审查</span>
+      </div>
+      <div class="article" id="analysis"></div>
+    </article>
+
+    <aside class="panel score-panel">
+      <div class="panel-head"><h2>多维评分</h2><span class="meta">1–5 分 · 再点已选分数可取消</span></div>
+      <div class="panel-body">
+        <div>
+          <div class="score-summary">
+            <div class="score-ring" id="scoreRing"><div><b id="averageScore">—</b><small>/ 5</small></div></div>
+            <div class="summary-copy">
+              <b id="scoreLabel">待完成评分</b>
+              <p id="scoreHelp">完成四个维度后生成综合评价</p>
+            </div>
+          </div>
+        </div>
+
+        <div id="dimensions"></div>
+
+        <div>
+          <div class="dimension">
+            <div class="dimension-head"><b>总体评语</b><span>可选</span></div>
+            <p>低于 3 分的维度必须说明具体理由</p>
+            <textarea class="note-area" id="notes" maxlength="500" placeholder="例如：模型正确识别准据法问题，但未区分仲裁地法与实体准据法，且缺少对强制性规范的分析……"></textarea>
+            <div class="note-meta"><span id="noteValidation"></span><span><span id="noteCount">0</span>/500</span></div>
+          </div>
+
+          <div class="dimension">
+            <div class="dimension-head"><b>问题标签</b><span>可多选</span></div>
+            <div class="tags" id="tags"></div>
+          </div>
+
+          <div class="dimension review-block">
+            <div class="dimension-head"><b>双人复核门禁</b><span id="gateBadge">draft</span></div>
+            <p>Reviewer A 完成初审，Reviewer B 独立复核；若存在核心分歧则进入 disputed，只有阻塞问题全部关闭后才能 locked。</p>
+
+            <div class="review-grid">
+              <label>
+                <span>Reviewer A</span>
+                <input id="reviewerAName" type="text" placeholder="如 Reviewer-A" maxlength="80" />
+              </label>
+              <label>
+                <span>Reviewer A 结论</span>
+                <select id="reviewAStatus">
+                  <option value="pending">pending · 未完成</option>
+                  <option value="approved">approved · 通过</option>
+                  <option value="changes_requested">changes requested · 需修改</option>
+                </select>
+              </label>
+              <label>
+                <span>Reviewer B</span>
+                <input id="reviewerBName" type="text" placeholder="如 Reviewer-B" maxlength="80" />
+              </label>
+              <label>
+                <span>Reviewer B 结论</span>
+                <select id="reviewBStatus">
+                  <option value="pending">pending · 未完成</option>
+                  <option value="approved">approved · 通过</option>
+                  <option value="changes_requested">changes requested · 需修改</option>
+                  <option value="disagree">disagree · 与 A 有分歧</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="review-grid review-grid-second">
+              <label>
+                <span>任务状态</span>
+                <select id="reviewStatus">
+                  <option value="draft">draft · 草稿</option>
+                  <option value="review_a_done">review_a_done · A 已完成</option>
+                  <option value="review_b_done">review_b_done · B 已完成</option>
+                  <option value="disputed">disputed · 存在分歧</option>
+                  <option value="locked">locked · 黄金数据已锁定</option>
+                </select>
+              </label>
+              <label>
+                <span>锁定人</span>
+                <input id="lockOwner" type="text" placeholder="locked 时必填" maxlength="80" />
+              </label>
+            </div>
+
+            <label class="review-wide">
+              <span>Reviewer A 备注</span>
+              <textarea id="reviewANote" rows="2" placeholder="记录初审发现、修改建议或通过依据"></textarea>
+            </label>
+            <label class="review-wide">
+              <span>Reviewer B 备注 / 分歧说明</span>
+              <textarea id="reviewBNote" rows="2" placeholder="独立复核意见；若 disagree，必须写明分歧点"></textarea>
+            </label>
+            <label class="review-wide">
+              <span>分歧裁决 / 关闭说明</span>
+              <textarea id="resolutionNote" rows="2" placeholder="disputed 后填写裁决结论；locked 前应说明阻塞问题已关闭"></textarea>
+            </label>
+
+            <div class="gate-checklist" id="gateChecklist"></div>
+            <div class="review-hint" id="reviewHint">当前尚未满足锁定门槛。</div>
+          </div>
+
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="footer-actions">
+    <span class="save-status" id="saveStatus">草稿自动保存在本地浏览器</span>
+    <button class="outline-btn" id="saveBtn">暂存草稿</button>
+    <button class="primary-btn" id="submitBtn">提交标注 · Ctrl/⌘ Enter</button>
+  </footer>
+
+  <div class="toast" id="toast" role="status"></div>
+
+
+  <dialog id="benchmarkDialog" class="benchmark-dialog">
+    <div class="dialog-head">
+      <div>
+        <h2>Benchmark 对齐信息</h2>
+        <small style="color:var(--muted)">把当前网页任务映射到法答网 Benchmark 的机器事实源与人工复核流程。</small>
+      </div>
+      <button class="icon-btn" id="closeBenchmarkDialog" aria-label="关闭">×</button>
+    </div>
+    <div class="benchmark-overview" id="benchmarkOverview"></div>
+    <div class="benchmark-detail" id="benchmarkDetail"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="outline-btn" id="exportCurrentBenchmark">导出当前复核 JSON</button>
+    </div>
+  </dialog>
+
+
+  <dialog id="datasetDialog">
+    <div class="dialog-head">
+      <div><h2>法答网 Benchmark 初步任务池</h2><small style="color:var(--muted)">内置任务池为 当前 Demo 共 10 条任务；91—140 的嵌套重复副本已按 task_id 去重。自定义导入数据仅保存在本机浏览器。</small></div>
+      <button class="icon-btn" id="closeDialog" aria-label="关闭">×</button>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b id="metricCount">10</b><span>标注任务</span></div>
+      <div class="metric"><b id="metricDomains">0</b><span>法律领域</span></div>
+      <div class="metric"><b id="metricEvidence">30</b><span>证据片段</span></div>
+      <div class="metric"><b>4</b><span>评分维度</span></div>
+    </div>
+    <div class="dataset-list" id="datasetList"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="outline-btn" id="downloadDataset">下载当前数据 JSON</button>
+    </div>
+  </dialog>
+
+  <dialog id="corpusDialog" class="corp-dialog">
+    <div class="dialog-head">
+      <div>
+        <h2>语料管理</h2>
+        <small style="color:var(--muted)">向本平台添加新的法律标注语料。表单用于逐条录入，TXT 文件用于批量导入；自定义语料保存在本机浏览器。</small>
+      </div>
+      <button class="icon-btn" id="closeCorpusDialog" aria-label="关闭">×</button>
+    </div>
+
+    <div class="corp-tabs" role="tablist">
+      <button class="corp-tab active" data-tab="form" role="tab">表单添加</button>
+      <button class="corp-tab" data-tab="txt" role="tab">TXT / JSONL 导入</button>
+      <button class="corp-tab" data-tab="manage" role="tab">任务管理 / 回收站</button>
+    </div>
+
+    <div class="corp-tab-panel active" data-panel="form">
+      <form id="addTaskForm" autocomplete="off">
+        <div class="corp-stat">
+          <div><b id="corpusStatBuiltIn">10</b><span>内置语料</span></div>
+          <div><b id="corpusStatCustom">0</b><span>自定义语料</span></div>
+          <div><b id="corpusStatTotal">10</b><span>当前总数</span></div>
+        </div>
+        <div class="corp-error" id="addTaskError"></div>
+        <div class="corp-scroll">
+          <section>
+            <h3>基本信息</h3>
+            <div class="corp-grid">
+              <div class="corp-field">
+                <label>案件编号<em>*</em></label>
+                <input type="text" id="f_id" placeholder="如 LFX-2026-011" />
+              </div>
+              <div class="corp-field">
+                <label>难度<em>*</em></label>
+                <select id="f_difficulty">
+                  <option value="高">高</option>
+                  <option value="中" selected>中</option>
+                  <option value="低">低</option>
+                </select>
+              </div>
+              <div class="corp-field">
+                <label>领域<em>*</em></label>
+                <input type="text" id="f_domain" placeholder="如 国际货物买卖" />
+              </div>
+              <div class="corp-field">
+                <label>法域<em>*</em></label>
+                <input type="text" id="f_jurisdiction" placeholder="如 中国 / 法国" />
+              </div>
+              <div class="corp-field cols-span-2">
+                <label>标题<em>*</em></label>
+                <input type="text" id="f_title" placeholder="一句话概括争议点" />
+              </div>
+              <div class="corp-field cols-span-2">
+                <label>当事人<em>*</em></label>
+                <input type="text" id="f_parties" placeholder="甲方 / 乙方，用「 / 」分隔" />
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h3>案件内容</h3>
+            <div class="corp-grid cols-1">
+              <div class="corp-field">
+                <label>基本事实<em>*</em></label>
+                <textarea id="f_facts" rows="4" placeholder="陈述案件背景、合同关键事实、争议过程等"></textarea>
+              </div>
+              <div class="corp-field">
+                <label>核心审查问题<em>*</em></label>
+                <textarea id="f_issues" rows="3" placeholder="每行一条审查问题"></textarea>
+                <span class="hint">每行一条</span>
+              </div>
+              <div class="corp-field">
+                <label>证据材料<em>*</em></label>
+                <textarea id="f_evidence" rows="3" placeholder="每行一条，格式：名称 | 类型 | 日期 | 状态"></textarea>
+                <span class="hint">类型可选：书证 / 电子数据 / 规则文本；日期如 2026-01-15；状态如 已核验 / 待复核 / 待核验</span>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h3>模型生成的分析（用于审查）</h3>
+            <div class="corp-grid cols-1">
+              <div class="corp-field">
+                <label>法律依据<em>*</em></label>
+                <textarea id="f_laws" rows="3" placeholder="每行一条法条 / 规则 / 原则"></textarea>
+                <span class="hint">每行一条</span>
+              </div>
+              <div class="corp-field">
+                <label>论证过程<em>*</em></label>
+                <textarea id="f_analysis" rows="5" placeholder="每行一段，对应一个论证步骤"></textarea>
+                <span class="hint">每行一段</span>
+              </div>
+              <div class="corp-field">
+                <label>一致性提示<em>*</em></label>
+                <textarea id="f_risk" rows="2" placeholder="指出模型结论中可能的跳跃、遗漏或争议点"></textarea>
+              </div>
+              <div class="corp-field">
+                <label>模型结论<em>*</em></label>
+                <textarea id="f_conclusion" rows="2" placeholder="模型最终给出的结论或倾向"></textarea>
+              </div>
+            </div>
+          </section>
+        </div>
+        <div class="corp-foot">
+          <span class="left">带 <em style="color:var(--red);font-style:normal">*</em> 为必填项；提交后会保存到本机浏览器</span>
+          <button type="button" class="ghost-btn" id="addTaskReset">重置</button>
+          <button type="submit" class="primary-btn" id="addTaskSubmit">加入语料库</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="corp-tab-panel" data-panel="txt">
+      <form id="importTaskForm" autocomplete="off">
+        <div class="corp-stat">
+          <div><b id="importStatValid">0</b><span>本次待导入</span></div>
+          <div><b id="importStatSkipped">0</b><span>重复跳过</span></div>
+          <div><b id="importStatCustom">0</b><span>导入后自定义</span></div>
+        </div>
+        <div class="corp-error" id="importTaskError"></div>
+        <div class="corp-scroll">
+          <section>
+            <h3>选择 TXT / JSON / JSONL 文件</h3>
+            <div class="corp-grid cols-1">
+              <div class="corp-field">
+                <label>语料文件<em>*</em></label>
+                <input type="file" id="importTxtFiles" accept=".txt,.json,.jsonl,text/plain,application/json,application/jsonl" multiple />
+                <span class="hint">可一次选择多个文件。TXT 支持“**问题** / **答案** / **相关法条** / **法条N**”；JSON/JSONL 可直接导入法答网 Benchmark 记录（task_id / query / source_qa / gold_norms 等字段）。</span>
+              </div>
+              <div class="corp-field">
+                <label>内容预览</label>
+                <textarea id="importTxtPreview" class="corp-json-area" readonly placeholder="选择 TXT 文件后，这里会预览第一个文件的内容"></textarea>
+                <span class="hint">TXT 按问答候选法条格式解析；JSON/JSONL 按法答网 Benchmark Schema 映射为复核任务，并保留 source_qa、gold_norms、verification、annotation_status 等信息。</span>
+              </div>
+            </div>
+          </section>
+        </div>
+        <div class="corp-foot">
+          <span class="left">按 UTF-8 读取；导入后写入本机浏览器。JSONL 按一行一条记录读取；重复 task_id 自动跳过。</span>
+          <button type="button" class="ghost-btn" id="importTxtClear">清空</button>
+          <button type="submit" class="primary-btn" id="importTxtSubmit">导入并加入工作台</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="corp-tab-panel" data-panel="manage">
+      <div class="corp-scroll">
+        <section>
+          <h3>已添加的自定义语料</h3><div class="hint" style="margin:-4px 0 10px">自定义任务可在这里编辑/删除；任意当前任务都可在主标注区删除。误删后可在下方“误删任务回收站”逐条恢复。</div>
+          <div id="manageList"></div>
+
+          <div id="manageEditor" style="display:none;margin-top:16px;padding:16px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.025)">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
+              <div>
+                <b id="manageEditorTitle">编辑语料</b>
+                <div class="hint">直接修改 TXT 内容后保存。系统会重新解析“问题 / 答案 / 相关法条 / 法条N”。</div>
+              </div>
+            </div>
+            <div class="corp-error" id="manageEditorError"></div>
+            <div class="corp-field">
+              <label>TXT 内容</label>
+              <textarea id="manageEditorRaw" class="corp-json-area" style="min-height:340px"></textarea>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
+              <button type="button" class="ghost-btn" id="manageEditorCancel">取消</button>
+              <button type="button" class="primary-btn" id="manageEditorSave">保存修改</button>
+            </div>
+          </div>
+        </section>
+        <section>
+          <h3>维护操作</h3>
+          <div class="corp-grid">
+            <div class="corp-field">
+              <label>导出</label>
+              <button type="button" class="outline-btn" id="exportCustomBtn">导出全部自定义语料 TXT</button>
+              <span class="hint">仅导出本机添加的语料（不含内置 10 条），可再次通过 TXT 导入</span>
+            </div>
+            <div class="corp-field">
+              <label>重置</label>
+              <button type="button" class="outline-btn" id="resetCustomBtn" style="color:var(--red);border-color:rgba(231,121,121,.55)">清空全部自定义语料</button>
+              <span class="hint">清空全部前会二次确认；已删除的预装任务不会因此恢复</span>
+            </div>
+            <div class="corp-field" style="grid-column:1/-1">
+              <label>误删任务回收站</label>
+              <div id="deletedTaskList" style="display:grid;gap:8px;margin:4px 0 8px"></div>
+              <button type="button" class="outline-btn" id="restoreDeletedBtn">恢复全部已删除任务（<span id="deletedBuiltInCount">0</span>）</button>
+              <span class="hint">预装任务和自定义任务都可恢复；恢复的是任务本身，删除前的本地标注/审核结果不会自动恢复。</span>
+            </div>
+          </div>
+        </section>
+      </div>
+      <div class="corp-foot">
+        <span class="left">所有改动只对本机浏览器生效；多端同步可使用「导出 TXT」+「TXT 导入」</span>
+        <button type="button" class="ghost-btn" id="closeManageBtn">关闭</button>
+      </div>
+    </div>
+  </dialog>
+
+    <script src="data/frontend_pool.js"></script>
+<script>
+    const builtInTasks = [
+      {
+        id: "LFX-2026-001", domain: "国际货物买卖", jurisdiction: "中国 / 新加坡", difficulty: "高",
+        title: "跨境设备采购合同 · CISG适用与根本违约",
+        parties: "华辰智能设备（中国） / Merlion Systems（新加坡）",
+        facts: "双方通过邮件确认采购精密检测设备，合同选择“适用中国法律”，未明确排除《联合国国际货物销售合同公约》。设备到货后连续发生精度偏差，买方在交付后第45日通知解除合同并索赔。",
+        issues: ["CISG是否因合同选择中国法而被排除？", "质量偏差是否达到根本违约程度？", "买方通知是否在合理期限内作出？"],
+        evidence: [
+          {name:"采购合同与技术附件", type:"书证", date:"2025-02-18", status:"已核验"},
+          {name:"双方邮件往来与验收通知", type:"电子数据", date:"2025-04-03", status:"已核验"},
+          {name:"CISG第6、25、39条", type:"规则文本", date:"1988-01-01", status:"待复核"}
+        ],
+        laws:["《联合国国际货物销售合同公约》第6条","《联合国国际货物销售合同公约》第25条","《联合国国际货物销售合同公约》第39条"],
+        analysis:[
+          "中国与新加坡均为CISG缔约国。合同仅约定适用中国法律，通常不足以推定双方排除CISG；CISG作为中国法律体系中适用于国际货物买卖的统一实体规范，应优先审查。",
+          "精度偏差若使设备无法实现合同明确约定的核心检测目的，且卖方在合理期限内无法修复，可能构成根本违约。现有检测报告仅证明偏差存在，尚不足以证明买方实质上丧失合同预期利益。",
+          "买方在交付后45日通知不合格，是否及时应结合设备复杂程度、合理检验周期与缺陷是否隐蔽判断。模型不应仅以固定天数直接认定通知逾期。"
+        ],
+        risk:"模型结论直接认定根本违约，但未说明偏差比例、修复可能性及合同目的受损程度，论证存在跳跃。",
+        conclusion:"现阶段可认定CISG原则上适用；是否构成根本违约仍需补充技术鉴定和修复可能性证据。"
+      },
+      {
+        id:"LFX-2026-002", domain:"国际商事仲裁", jurisdiction:"中国 / 英国", difficulty:"高",
+        title:"跨境许可协议 · 仲裁条款效力与准据法",
+        parties:"启明生物（中国） / Northbridge Pharma（英国）",
+        facts:"技术许可合同约定争议提交香港国际仲裁中心，仲裁地为香港，合同实体适用英国法。中方主张签约代表越权，仲裁协议无效。",
+        issues:["仲裁协议效力应适用何地法律？","代表越权是否当然导致仲裁协议无效？","仲裁条款独立性如何适用？"],
+        evidence:[
+          {name:"技术许可协议",type:"书证",date:"2024-08-11",status:"已核验"},
+          {name:"董事会授权与签约邮件",type:"电子数据",date:"2024-08-09",status:"待核验"},
+          {name:"香港《仲裁条例》相关条文",type:"规则文本",date:"2011-06-01",status:"已核验"}
+        ],
+        laws:["《纽约公约》第V条","香港《仲裁条例》","仲裁协议独立性原则"],
+        analysis:["合同明确仲裁地为香港，仲裁协议效力通常应结合当事人选择及仲裁地法判断，不能仅因实体合同选择英国法即当然适用英国法。","签约代表越权可能影响合同及仲裁协议的成立，但应分别审查表见授权、事后追认和相对方善意。","仲裁条款具有可分性，主合同效力争议不当然消灭仲裁协议。"],
+        risk:"模型混同实体准据法、仲裁协议准据法与仲裁程序法，需要拆分冲突规范分析路径。",
+        conclusion:"应优先依据仲裁地法审查仲裁协议效力，并独立判断授权瑕疵对仲裁合意的影响。"
+      },
+      {
+        id:"LFX-2026-003", domain:"跨境数据合规", jurisdiction:"中国 / 德国", difficulty:"高",
+        title:"跨境研发协作 · 个人信息出境合规",
+        parties:"澄海医疗科技（中国） / RheinLab GmbH（德国）",
+        facts:"双方联合训练医学影像算法，中方拟向德国传输经编码处理的患者影像与诊疗标签。样本仍可通过院内映射表重新识别个人。",
+        issues:["编码处理后的数据是否仍属个人信息？","出境活动应满足何种程序条件？","科研目的能否替代单独同意与影响评估？"],
+        evidence:[
+          {name:"联合研发与数据处理协议",type:"书证",date:"2025-01-20",status:"已核验"},
+          {name:"数据字段与去标识化说明",type:"电子数据",date:"2025-01-22",status:"已核验"},
+          {name:"个人信息保护法及配套规则",type:"规则文本",date:"2021-11-01",status:"待复核"}
+        ],
+        laws:["《个人信息保护法》第38条","《个人信息保护法》第55条","《数据出境安全评估办法》"],
+        analysis:["数据可借助中方掌握的映射表重新识别患者，编码处理并未达到不可复原的匿名化标准，仍应作为个人信息处理。","出境路径需结合处理者属性、数据规模、敏感个人信息数量及最新配套规则判断，不能只给出单一程序结论。","医学影像和诊疗标签可能构成敏感个人信息，科研目的不能当然替代合法性基础、单独同意和个人信息保护影响评估。"],
+        risk:"模型引用的数量门槛可能因规则更新而变化；训练数据必须保留规则版本与生效日期。",
+        conclusion:"应按敏感个人信息出境处理，先完成影响评估并根据适用门槛选择法定出境机制。"
+      },
+      {
+        id:"LFX-2026-004", domain:"海事海商", jurisdiction:"中国 / 巴拿马", difficulty:"中",
+        title:"国际海上运输 · 提单管辖与承运人责任",
+        parties:"海岳贸易（中国） / Pacific Star Shipping（巴拿马）",
+        facts:"一批冷冻水产品自青岛运往鹿特丹，提单背面载有外国法院专属管辖条款。货到后发现冷藏温度记录异常并产生货损。",
+        issues:["提单管辖条款是否有效并纳入合同？","实际承运人与契约承运人如何识别？","承运人能否主张免责或责任限制？"],
+        evidence:[
+          {name:"正本提单与订舱单",type:"书证",date:"2025-03-06",status:"已核验"},
+          {name:"冷藏箱温度日志",type:"电子数据",date:"2025-03-28",status:"已核验"},
+          {name:"海商法与相关司法解释",type:"规则文本",date:"1993-07-01",status:"待复核"}
+        ],
+        laws:["《中华人民共和国海商法》承运人责任规则","涉外民事关系法律适用规则","海事诉讼特别程序相关规定"],
+        analysis:["管辖条款效力应审查其提示程度、当事人合意、与争议的实际联系及是否违反专属管辖规定。","签发提单主体、实际运输控制与船舶经营信息共同影响承运人识别。","温度日志显示运输途中多次超限，承运人需证明免责事由与货损之间的因果关系。"],
+        risk:"模型将船东直接等同于承运人，未充分区分契约承运人与实际承运人。",
+        conclusion:"现有证据可初步支持运输期间温控义务违反，但责任主体与管辖条款效力仍需分别审查。"
+      },
+      {
+        id:"LFX-2026-005", domain:"跨境投资", jurisdiction:"中国 / 荷兰", difficulty:"高",
+        title:"外商投资协议 · VIE安排与合同效力",
+        parties:"辰途教育科技（中国） / Tulip Ventures B.V.（荷兰）",
+        facts:"境外投资人通过一组控制协议取得境内增值电信企业收益与经营控制权。发生回购争议后，境内创始人主张协议规避外资准入限制而无效。",
+        issues:["合同效力评价应区分哪些协议与义务？","违反准入限制是否当然导致全部协议无效？","返还、折价补偿和过错责任如何处理？"],
+        evidence:[
+          {name:"独家业务合作及股权质押协议",type:"书证",date:"2022-06-18",status:"已核验"},
+          {name:"控制权与资金流记录",type:"电子数据",date:"2024-12-31",status:"待核验"},
+          {name:"外商投资准入特别管理措施",type:"规则文本",date:"2024-11-01",status:"已核验"}
+        ],
+        laws:["《民法典》合同效力规则","《外商投资法》","外商投资准入特别管理措施"],
+        analysis:["应按协议功能和具体诉请分别审查，避免以交易结构标签替代效力分析。","是否违反强制性规定及是否损害公共利益，需要结合准入行业、控制效果和监管目的判断。","即使部分安排被否定，财产返还、收益分配与过错责任也应基于实际履行状态分别处理。"],
+        risk:"模型使用“VIE协议当然无效”的绝对化表达，缺乏对规范目的与裁判后果的分层分析。",
+        conclusion:"不能仅凭VIE结构作出整体无效结论，应结合具体行业限制、控制效果和诉请逐项评价。"
+      },
+      {
+        id:"LFX-2026-006", domain:"国际知识产权", jurisdiction:"中国 / 美国", difficulty:"中",
+        title:"跨境软件许可 · 开源组件义务与违约",
+        parties:"云序科技（中国） / Atlas Cloud Inc.（美国）",
+        facts:"中方交付的企业软件含GPL许可组件，美方称其未收到对应源代码并暂停支付许可费。合同约定交付物不得含有导致专有代码开放的组件。",
+        issues:["开源许可证义务与合同保证如何区分？","组件使用方式是否触发源代码提供义务？","暂停付款是否符合比例原则和合同约定？"],
+        evidence:[
+          {name:"软件许可与交付合同",type:"书证",date:"2024-05-12",status:"已核验"},
+          {name:"软件物料清单与扫描报告",type:"电子数据",date:"2024-07-19",status:"待核验"},
+          {name:"GPL许可文本",type:"规则文本",date:"2007-06-29",status:"已核验"}
+        ],
+        laws:["合同约定的保证与救济条款","GPLv3许可条件","涉外合同法律适用规则"],
+        analysis:["应先确认组件版本、链接方式、分发行为与对应许可证条件，再判断是否触发源代码义务。","即便未触发许可证层面的义务，合同中更严格的开源合规保证仍可能被违反。","美方暂停全部付款是否有据，取决于违约严重性、补救期限和付款义务的可分性。"],
+        risk:"模型直接以“使用GPL组件”推导全部专有代码必须公开，技术事实与法律结论之间缺少中间判断。",
+        conclusion:"需补充组件集成与分发方式证据；合同违约判断不能被开源许可证结论完全替代。"
+      },
+      {
+        id:"LFX-2026-007", domain:"国际贸易救济", jurisdiction:"中国 / 欧盟", difficulty:"高",
+        title:"反倾销调查 · 出口价格调整与关联交易",
+        parties:"远航铝业（中国） / 欧盟进口关联公司",
+        facts:"出口商通过欧盟关联进口商销售涉案产品，调查机关拟以首次转售给独立买方的价格构造出口价格，并扣减进口后费用和利润。",
+        issues:["关联交易下出口价格如何确定？","费用调整是否存在重复扣减？","企业提交数据的可验证性是否充分？"],
+        evidence:[
+          {name:"出口与转售发票样本",type:"书证",date:"2025-05-31",status:"已核验"},
+          {name:"关联公司ERP销售数据",type:"电子数据",date:"2025-06-03",status:"待核验"},
+          {name:"WTO反倾销协定第2条",type:"规则文本",date:"1995-01-01",status:"已核验"}
+        ],
+        laws:["WTO《反倾销协定》第2条","欧盟基础反倾销条例","调查问卷填报规则"],
+        analysis:["关联交易价格可能不具可靠性，可从首次转售给独立买方的价格出发构造出口价格。","调整项目应与进口和转售阶段实际发生的成本相对应，并排除重复扣减。","若ERP数据无法与审计报表、报关单和抽样发票勾稽，调查机关可能采用可获得事实。"],
+        risk:"模型未区分价格可比性调整与构造出口价格时的扣减项目，存在概念混用。",
+        conclusion:"构造出口价格具有依据，但每项调整均需以可核验数据证明并接受重复扣减检查。"
+      },
+      {
+        id:"LFX-2026-008", domain:"涉外劳动用工", jurisdiction:"中国 / 法国", difficulty:"中",
+        title:"跨国派遣用工 · 劳动关系与强制性规范",
+        parties:"欧陆咨询法国总部 / 上海项目团队负责人",
+        facts:"法国总部与员工签订法国劳动合同并派驻上海两年，工资由总部支付，上海关联公司负责日常考勤和绩效。员工在上海被解除派驻并主张违法解除赔偿。",
+        issues:["劳动关系主体如何识别？","当事人选择法国法能否排除中国强制性劳动规范？","派驻结束与劳动合同解除是否同一法律行为？"],
+        evidence:[
+          {name:"法国劳动合同与派驻函",type:"书证",date:"2023-09-01",status:"已核验"},
+          {name:"考勤、绩效与报销系统记录",type:"电子数据",date:"2025-08-31",status:"已核验"},
+          {name:"劳动合同法相关规定",type:"规则文本",date:"2013-07-01",status:"待复核"}
+        ],
+        laws:["《涉外民事关系法律适用法》第43条","《劳动合同法》","直接适用的强制性规定"],
+        analysis:["劳动关系主体需结合合同、报酬支付、管理控制和用工风险综合识别，不能只依据工资来源。","劳动者在中国境内持续工作，相关强制性保护规范是否直接适用应独立审查。","结束派驻不当然等于解除与法国总部之间的劳动合同，应识别具体通知内容与后续安排。"],
+        risk:"模型只以日常考勤管理认定上海公司为唯一用人单位，证据评价过于单一。",
+        conclusion:"应分别判断总部与关联公司的用工地位，并区分派驻关系终止与劳动合同解除。"
+      },
+      {
+        id:"LFX-2026-009", domain:"跨境电子商务", jurisdiction:"中国 / 日本", difficulty:"中",
+        title:"跨境平台交易 · 消费者保护与格式条款",
+        parties:"中国消费者 / 日本美妆品牌跨境旗舰店",
+        facts:"消费者通过中文跨境电商页面购买美容仪，页面称“海外直邮、全球联保”，售后条款却限定只能向日本服务商送修并由消费者承担国际运费。",
+        issues:["经营者身份与平台责任如何识别？","全球联保宣传是否构成合同内容？","售后格式条款的提示说明义务是否履行？"],
+        evidence:[
+          {name:"订单页面与售后条款截图",type:"电子数据",date:"2025-11-12",status:"已核验"},
+          {name:"付款凭证与物流信息",type:"书证",date:"2025-11-15",status:"已核验"},
+          {name:"消费者权益保护相关规则",type:"规则文本",date:"2024-07-01",status:"待复核"}
+        ],
+        laws:["《消费者权益保护法》","《电子商务法》","《民法典》格式条款规则"],
+        analysis:["经营者身份应依据店铺公示、收款主体、发票与实际履约关系综合判断。","“全球联保”若足以影响交易决定，可能成为合同内容或构成对售后服务的承诺。","将高额国际运费全部转由消费者承担的条款，应审查是否显著提示及是否不合理减轻经营者责任。"],
+        risk:"模型在未查明经营者与平台角色的情况下直接要求平台承担全部退款责任。",
+        conclusion:"应先识别经营者和平台责任边界，再评价宣传承诺与售后格式条款的效力。"
+      },
+      {
+        id:"LFX-2026-010", domain:"外国判决承认执行", jurisdiction:"中国 / 阿联酋", difficulty:"高",
+        title:"外国金钱判决 · 承认与执行条件审查",
+        parties:"Desert Gate Trading LLC / 华东供应链有限公司",
+        facts:"阿联酋法院就国际供货合同作出缺席金钱判决，债权人向中国法院申请承认与执行。被申请人称未获得适当送达，且外国程序未给予充分答辩机会。",
+        issues:["承认与执行的法律依据是什么？","送达与缺席判决应如何审查？","公共秩序保留的适用边界如何把握？"],
+        evidence:[
+          {name:"外国法院判决及证明文件",type:"书证",date:"2025-06-18",status:"待核验"},
+          {name:"跨境送达记录",type:"电子数据",date:"2024-12-09",status:"待核验"},
+          {name:"民事诉讼法涉外编相关规定",type:"规则文本",date:"2024-01-01",status:"已核验"}
+        ],
+        laws:["《中华人民共和国民事诉讼法》涉外编","相关国际条约或互惠审查规则","程序性公共秩序原则"],
+        analysis:["应首先确认是否存在适用条约；无条约时，再依据中国法律规定审查互惠及法定拒绝事由。","缺席判决本身不当然阻却承认，但须核实传票和诉讼文书是否依法、及时送达并保障答辩机会。","公共秩序保留应保持克制，程序瑕疵应优先纳入法定程序保障条款审查。"],
+        risk:"模型把“存在缺席判决”直接等同于违反中国公共秩序，适用标准过宽。",
+        conclusion:"承认与否取决于送达真实性、程序保障和互惠依据，现有材料不足以作肯定结论。"
+      }
+    ];
+
+
+    // ----- 法答网 Benchmark 示例：直接映射自本项目 FDW-2026-0100 -----
+    builtInTasks.unshift({
+      sourceFormat: "fadawang-benchmark",
+      id: "FDW-2026-0100",
+      domain: "涉外仲裁司法审查",
+      jurisdiction: "中华人民共和国大陆地区",
+      difficulty: "中",
+      title: "法答网 Benchmark · 外国仲裁裁决申请期间性质",
+      parties: "法答网精选答问 / Benchmark",
+      facts: "外国仲裁裁决作出后，对方先只申请法院承认，过了一段时间才申请执行。法院能否主动以超过期限为由拒绝，单独申请承认是否会让执行期间重新计算？",
+      issues: ["涉外仲裁司法审查", "承认执行期间", "外国仲裁裁决申请期间性质"],
+      evidence: [
+        {name:"民诉法解释 第五百四十五条第一款",type:"规则文本",date:"2026-08-18",status:"双源一致"},
+        {name:"民事诉讼法 第二百五十条",type:"规则文本",date:"2026-08-18",status:"双源一致"},
+        {name:"民法典 第一百九十三条",type:"规则文本",date:"2026-08-18",status:"双源一致"},
+        {name:"诉讼时效司法解释 第二条",type:"规则文本",date:"2026-08-18",status:"双源一致"},
+        {name:"民诉法解释 第五百四十五条第二款",type:"规则文本",date:"2026-08-18",status:"双源一致"}
+      ],
+      laws: [
+        "最高人民法院关于适用《中华人民共和国民事诉讼法》的解释 第五百四十五条第一款",
+        "中华人民共和国民事诉讼法 第二百五十条",
+        "中华人民共和国民法典 第一百九十三条",
+        "最高人民法院关于审理民事案件适用诉讼时效制度若干问题的规定 第二条",
+        "最高人民法院关于适用《中华人民共和国民事诉讼法》的解释 第五百四十五条第二款"
+      ],
+      analysis: [
+        "从生活事实识别争点",
+        "完整匹配答疑规范",
+        "核对适用条件与例外",
+        "形成有条件结论"
+      ],
+      risk: "当前 annotation_status 为 draft，reviewers 仅 1 人；正式 locked 前应完成独立复核。另需关注法答网答疑中的条号与现行解释文本之间的版本映射。",
+      conclusion: "申请期间适用诉讼时效规则，法院不主动审查；先只申请承认的，执行期间自承认裁定生效之日起重新计算。",
+      benchmark: {
+        task_id: "FDW-2026-0100",
+        task_name: "外国仲裁裁决申请期间性质",
+        batch_number: 14,
+        as_of_date: "2026-08-18",
+        annotation_status: "draft",
+        legal_relationship_labels: ["涉外仲裁司法审查", "承认执行期间"],
+        issue_labels: ["外国仲裁裁决申请期间性质"],
+        source_question: "申请承认和执行外国仲裁裁决的期间，是诉讼时效还是除斥期间？人民法院是否应当主动依职权审查？当事人仅申请承认而未同时申请执行，申请执行期间是否重新起算？",
+        source_answer_summary: "申请期间适用诉讼时效规则，法院不主动审查；先只申请承认的，执行期间自承认裁定生效之日起重新计算。",
+        source_answer_text: "首先，申请承认和执行外国仲裁裁决的期间，适用诉讼时效的规定。其次，人民法院不应依职权主动审查当事人是否超过申请承认和执行的期间。最后，当事人仅申请承认而未同时申请执行的，申请执行期间自承认裁定生效之日起重新计算。",
+        answer_url: "https://www.court.gov.cn/zixun/xiangqing/451061.html",
+        published_at: "2025-01-02",
+        key_middle: ["识别决定性事实", "定位承认执行期间适用规则", "审查例外和程序后果"],
+        key_answer: ["申请期间适用诉讼时效规则，法院不主动审查；先只申请承认的，执行期间自承认裁定生效之日起重新计算。"],
+        gold_path: ["从生活事实识别争点", "完整匹配答疑规范", "核对适用条件与例外", "形成有条件结论"],
+        reviewers: ["Codex-cn-legal-data-revalidator"],
+        verification_notes: "已恢复最高法答疑全文并穷举规范引用；当前状态保持 draft。",
+        gold_norms: [
+          {
+            norm_name:"最高人民法院关于适用《中华人民共和国民事诉讼法》的解释",
+            provision_locator:"第五百四十五条第一款",
+            full_text:"当事人申请承认和执行外国法院作出的发生法律效力的判决、裁定或者外国仲裁裁决的期间，适用民事诉讼法第二百四十六条的规定。",
+            validity:"现行有效", verification_status:"dual_source_matched",
+            source_url:"https://flk.npc.gov.cn/", secondary_source_url:"https://api.ucoworker.com/v1/data/cn-legal/mcp"
+          },
+          {
+            norm_name:"中华人民共和国民事诉讼法",
+            provision_locator:"第二百五十条",
+            full_text:"申请执行的期间为二年。申请执行时效的中止、中断，适用法律有关诉讼时效中止、中断的规定。",
+            validity:"现行有效", verification_status:"dual_source_matched",
+            source_url:"https://flk.npc.gov.cn/", secondary_source_url:"https://api.ucoworker.com/v1/data/cn-legal/mcp"
+          },
+          {
+            norm_name:"中华人民共和国民法典",
+            provision_locator:"第一百九十三条",
+            full_text:"人民法院不得主动适用诉讼时效的规定。",
+            validity:"现行有效", verification_status:"dual_source_matched",
+            source_url:"https://flk.npc.gov.cn/", secondary_source_url:"https://api.ucoworker.com/v1/data/cn-legal/mcp"
+          },
+          {
+            norm_name:"最高人民法院关于审理民事案件适用诉讼时效制度若干问题的规定",
+            provision_locator:"第二条",
+            full_text:"当事人未提出诉讼时效抗辩，人民法院不应对诉讼时效问题进行释明。",
+            validity:"现行有效", verification_status:"dual_source_matched",
+            source_url:"https://flk.npc.gov.cn/", secondary_source_url:"https://api.ucoworker.com/v1/data/cn-legal/mcp"
+          },
+          {
+            norm_name:"最高人民法院关于适用《中华人民共和国民事诉讼法》的解释",
+            provision_locator:"第五百四十五条第二款",
+            full_text:"当事人仅申请承认而未同时申请执行的，申请执行的期间自人民法院对承认申请作出的裁定生效之日起重新计算。",
+            validity:"现行有效", verification_status:"dual_source_matched",
+            source_url:"https://flk.npc.gov.cn/", secondary_source_url:"https://api.ucoworker.com/v1/data/cn-legal/mcp"
+          }
+        ]
+      }
+    });
+
+    // ===== 预装标注任务池：week5 + week6 去重后共 170 条 =====
+    const INITIAL_BENCHMARK_POOL = window.__BENCHMARK_POOL__ || [];
+    builtInTasks.length = 0;
+    builtInTasks.push(...INITIAL_BENCHMARK_POOL);
+    // ===== 预装标注任务池结束 =====
+
+    const dimensionDefs = [
+      {id:"accuracy", name:"争点与结论准确性", hint:"法律关系、核心争点与黄金结论是否准确"},
+      {id:"logic", name:"推理路径完整性", hint:"是否覆盖关键中间步骤、条件、例外和程序后果"},
+      {id:"citation", name:"规范闭合与核验", hint:"原回答引用是否穷举，黄金规范、条号与双源核验是否可靠"},
+      {id:"consistency", name:"题面与黄金保真", hint:"生活化改写是否不泄露答案、又完整保留决定性事实"}
+    ];
+    const issueTags = ["引用漏项","条号错配","双源不一致","版本时点风险","题面泄露","事实不足","黄金答案不完整","复核人数不足"];
+
+    function isAnnotationComplete(task, state) {
+      if (!task || !state) return false;
+      if (task.sourceFormat === "qa-law-txt") {
+        const items = Array.isArray(task.lawItems) ? task.lawItems : [];
+        if (!items.length) return false;
+        const labels = state.lawLabels && typeof state.lawLabels === "object" ? state.lawLabels : {};
+        return items.every((law, i) => {
+          const value = labels[String(law.index || i + 1)];
+          return value === 0 || value === 1 || value === 2;
+        });
+      }
+      if (task.sourceFormat === "fadawang-benchmark") {
+        const scores = state.scores && typeof state.scores === "object" ? state.scores : {};
+        return dimensionDefs.every(def => [1,2,3,4,5].includes(Number(scores[def.id])));
+      }
+      const scores = state.scores && typeof state.scores === "object" ? state.scores : {};
+      return dimensionDefs.every(def => [1,2,3,4,5].includes(Number(scores[def.id])));
+    }
+
+    function reopenTaskForAnnotation(state, options = {}) {
+      if (!state) return;
+      state.submitted = false;
+      state.reviewStatus = "draft";
+      state.reviewAStatus = "pending";
+      state.reviewBStatus = "pending";
+      state.lockedAt = "";
+      state.lockOwner = "";
+
+      // Reviewer 姓名和历史备注保留，方便重新复核时参考；旧“通过”结论会失效。
+      if ($("reviewStatus")) $("reviewStatus").value = "draft";
+      if ($("reviewAStatus")) $("reviewAStatus").value = "pending";
+      if ($("reviewBStatus")) $("reviewBStatus").value = "pending";
+      if ($("lockOwner")) $("lockOwner").value = "";
+
+      if (!options.silent) {
+        showToast(options.message || "标注已变更，任务已退回待标注");
+      }
+    }
+
+    // ----- 语料库：内置 + 用户自定义（localStorage 持久化） -----
+    const STORAGE_KEY_TASKS = "lexalign-custom-tasks-v2-qa-law";
+    const STORAGE_KEY_DELETED_TASKS = "lexalign-deleted-built-in-task-ids-v21";
+    const STORAGE_KEY_DELETED_CUSTOM_TASKS = "lexalign-deleted-custom-tasks-v23";
+
+    function loadDeletedTaskIds() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_DELETED_TASKS);
+        if (!raw) return [];
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr.map(String).filter(Boolean) : [];
+      } catch (_) { return []; }
+    }
+
+    function saveDeletedTaskIds() {
+      try {
+        localStorage.setItem(
+          STORAGE_KEY_DELETED_TASKS,
+          JSON.stringify(Array.from(deletedTaskIds))
+        );
+      } catch (_) {
+        showToast("当前浏览器不允许保存删除记录");
+      }
+    }
+
+    function loadDeletedCustomTasks() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_DELETED_CUSTOM_TASKS);
+        if (!raw) return [];
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr.filter(t => t && t.id) : [];
+      } catch (_) { return []; }
+    }
+
+    function saveDeletedCustomTasks() {
+      try {
+        localStorage.setItem(STORAGE_KEY_DELETED_CUSTOM_TASKS, JSON.stringify(deletedCustomTasks));
+      } catch (_) {
+        showToast("当前浏览器不允许保存回收站");
+      }
+    }
+
+    function getActiveBuiltInTasks() {
+      return builtInTasks.filter(t => !deletedTaskIds.has(String(t.id)));
+    }
+
+
+    function loadCustomTasks() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_TASKS);
+        if (!raw) return [];
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr.filter(t => t && t.id) : [];
+      } catch (_) { return []; }
+    }
+
+    function saveCustomTasks() {
+      try { localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(customTasks)); }
+      catch (_) { showToast("当前浏览器不允许本地保存"); }
+    }
+
+    let deletedTaskIds = new Set(loadDeletedTaskIds());
+    let deletedCustomTasks = loadDeletedCustomTasks();
+    let customTasks = loadCustomTasks();
+    const tasks = getActiveBuiltInTasks().concat(customTasks);
+
+    function syncStatesWithTasks() {
+      // 保证 states 长度与 tasks 一致；保留已存在的标注，缺少的补上、溢出的清掉
+      const next = tasks.map(t => ({scores:{}, notes:"", tags:[], submitted:false, lawLabels:{}, reviewStatus:"draft", reviewerA:"", reviewerB:"", reviewAStatus:"pending", reviewBStatus:"pending", reviewANote:"", reviewBNote:"", resolutionNote:"", lockOwner:"", lockedAt:""}));
+      for (let i = 0; i < Math.min(states.length, next.length); i++) {
+        if (states[i]) Object.assign(next[i], states[i]);
+      }
+      states.length = 0;
+      states.push(...next);
+      if (index >= states.length) index = Math.max(0, states.length - 1);
+    }
+
+    let index = 0;
+    let evidenceFilter = "all";
+    const states = tasks.map(t => ({scores:{}, notes:"", tags:[], submitted:false, lawLabels:{}, reviewStatus:"draft", reviewerA:"", reviewerB:"", reviewAStatus:"pending", reviewBStatus:"pending", reviewANote:"", reviewBNote:"", resolutionNote:"", lockOwner:"", lockedAt:""}));
+
+    const $ = id => document.getElementById(id);
+    const taskSelect = $("taskSelect");
+    const toast = $("toast");
+
+    function escapeHTML(value) {
+      return String(value).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+    }
+
+    function renderTaskOptions() {
+      taskSelect.innerHTML = tasks.map((t, i) => {
+        const customMark = t.__custom ? " ·自定义" : "";
+        return `<option value="${i}">${String(i+1).padStart(2,"0")} · ${escapeHTML(t.domain)}｜${escapeHTML(t.title.split(" · ")[1] || t.title)}${customMark}</option>`;
+      }).join("");
+    }
+
+    function render() {
+      const t = tasks[index];
+      const state = states[index];
+      taskSelect.value = index;
+      const isQaLaw = t.sourceFormat === "qa-law-txt";
+      const isBenchmark = t.sourceFormat === "fadawang-benchmark";
+      $("headerTitle").textContent = t.title;
+      $("headerMeta").textContent = isQaLaw ? "法律问答 · 候选法条相关性数据" : (isBenchmark ? "法答网 Benchmark · 黄金数据人工复核" : `${t.domain} · 法律解释质检`);
+      $("caseId").textContent = t.id;
+      if ($("currentTaskManageId")) $("currentTaskManageId").textContent = t.id;
+      if ($("deleteCurrentTaskBtn")) $("deleteCurrentTaskBtn").disabled = tasks.length <= 1;
+      $("progressText").textContent = `${index + 1} / ${tasks.length}`;
+      $("progressFill").style.width = `${((index + 1) / tasks.length) * 100}%`;
+
+      $("leftPanelTitle").textContent = isQaLaw ? "问题与候选法条" : (isBenchmark ? "生活化题面与黄金依据" : "案件事实与证据");
+      $("factsSectionTitle").textContent = isQaLaw ? "问题" : (isBenchmark ? "Benchmark Query" : "基本事实");
+      $("evidenceSectionTitle").textContent = isQaLaw ? "候选法条" : (isBenchmark ? "Gold Norms" : "证据材料");
+      $("issuesSectionTitle").textContent = isQaLaw ? "" : (isBenchmark ? "法律关系与争点" : "核心审查问题");
+      $("issuesSectionTitle").closest(".section-card").style.display = isQaLaw ? "none" : "";
+      $("analysisPanelTitle").textContent = isQaLaw ? "答案与相关法条" : (isBenchmark ? "Source QA → Gold Answer" : "模型生成的法律分析");
+      $("analysisPanelMeta").textContent = isQaLaw ? "逐法条在线标注 · 0 / 1 / 2" : (isBenchmark ? "来源可追踪 · 双源核验 · 审核流" : "引用可追踪 · 论证链审查");
+
+      if (isQaLaw) {
+        $("facts").textContent = t.question || t.facts;
+        if (!state.lawLabels || typeof state.lawLabels !== "object") state.lawLabels = {};
+        const counts = {0:0, 1:0, 2:0};
+        let labeled = 0;
+        (t.lawItems || []).forEach((law, i) => {
+          const lawNo = String(law.index || i + 1);
+          const value = state.lawLabels[lawNo];
+          if (value === 0 || value === 1 || value === 2) {
+            counts[value]++;
+            labeled++;
+          }
+        });
+        $("caseMeta").innerHTML = [
+          ["来源文件", t.sourceFile || "TXT"],
+          ["候选法条", `${(t.lawItems || []).length} 条`],
+          ["标注进度", `${labeled} / ${(t.lawItems || []).length}`],
+          ["标注分布", `0:${counts[0]} · 1:${counts[1]} · 2:${counts[2]}`]
+        ].map(([k,v]) => `<div class="meta-cell"><span>${k}</span><b title="${escapeHTML(v)}">${escapeHTML(v)}</b></div>`).join("");
+        $("issues").innerHTML = "";
+        document.querySelector(".evidence-toolbar").innerHTML = `
+          <button class="chip active" data-filter="all">全部</button>
+          <button class="chip" data-filter="规则文本">规则文本</button>`;
+        evidenceFilter = "all";
+      } else if (isBenchmark) {
+        const b = t.benchmark || {};
+        $("facts").textContent = t.facts || "";
+        $("caseMeta").innerHTML = [
+          ["Task ID", b.task_id || t.id],
+          ["法答网批次", b.batch_number ? `第 ${b.batch_number} 批` : "—"],
+          ["As-of", b.as_of_date || "—"],
+          ["状态", b.annotation_status || "draft"]
+        ].map(([k,v]) => `<div class="meta-cell"><span>${k}</span><b title="${escapeHTML(v)}">${escapeHTML(v)}</b></div>`).join("");
+        $("issues").innerHTML = [
+          ...((b.legal_relationship_labels || []).map(x => `法律关系 · ${x}`)),
+          ...((b.issue_labels || []).map(x => `核心争点 · ${x}`))
+        ].map(x => `<li>${escapeHTML(x)}</li>`).join("");
+        document.querySelector(".evidence-toolbar").innerHTML = `
+          <button class="chip ${evidenceFilter === "all" ? "active" : ""}" data-filter="all">全部</button>
+          <button class="chip ${evidenceFilter === "规则文本" ? "active" : ""}" data-filter="规则文本">黄金规范</button>`;
+      } else {
+        $("facts").innerHTML = t.facts.replace(/双方|合同|模型/g, m => `<strong>${m}</strong>`);
+        $("caseMeta").innerHTML = [
+          ["当事人", t.parties], ["法域", t.jurisdiction], ["领域", t.domain], ["难度", t.difficulty]
+        ].map(([k,v]) => `<div class="meta-cell"><span>${k}</span><b title="${escapeHTML(v)}">${escapeHTML(v)}</b></div>`).join("");
+        $("issues").innerHTML = t.issues.map(x => `<li>${escapeHTML(x)}</li>`).join("");
+        document.querySelector(".evidence-toolbar").innerHTML = `
+          <button class="chip ${evidenceFilter === "all" ? "active" : ""}" data-filter="all">全部</button>
+          <button class="chip ${evidenceFilter === "书证" ? "active" : ""}" data-filter="书证">书证</button>
+          <button class="chip ${evidenceFilter === "电子数据" ? "active" : ""}" data-filter="电子数据">电子数据</button>
+          <button class="chip ${evidenceFilter === "规则文本" ? "active" : ""}" data-filter="规则文本">规则文本</button>`;
+      }
+      renderEvidence();
+      renderAnalysis();
+      renderDimensions();
+      $("notes").value = state.notes;
+      $("noteCount").textContent = state.notes.length;
+      $("tags").innerHTML = issueTags.map(tag => `<button class="tag ${state.tags.includes(tag) ? "active alert" : ""}" data-tag="${tag}">${tag}</button>`).join("");
+      if ($("reviewStatus")) $("reviewStatus").value = state.reviewStatus || "draft";
+      if ($("reviewerAName")) $("reviewerAName").value = state.reviewerA || "";
+      if ($("reviewerBName")) $("reviewerBName").value = state.reviewerB || "";
+      if ($("reviewAStatus")) $("reviewAStatus").value = state.reviewAStatus || "pending";
+      if ($("reviewBStatus")) $("reviewBStatus").value = state.reviewBStatus || "pending";
+      if ($("reviewANote")) $("reviewANote").value = state.reviewANote || "";
+      if ($("reviewBNote")) $("reviewBNote").value = state.reviewBNote || "";
+      if ($("resolutionNote")) $("resolutionNote").value = state.resolutionNote || "";
+      if ($("lockOwner")) $("lockOwner").value = state.lockOwner || "";
+      updateScoreSummary();
+      updateSubmitState();
+      $("saveStatus").textContent = state.submitted ? "本条已提交，可继续修订" : (isQaLaw ? "法条标注自动保存在本地浏览器" : (isBenchmark ? "Benchmark 复核草稿自动保存在本地浏览器" : "草稿自动保存在本地浏览器"));
+    }
+
+    function renderEvidence() {
+      const t = tasks[index];
+      const filtered = t.evidence.map((e, i) => ({...e, originalIndex:i})).filter(e => evidenceFilter === "all" || e.type === evidenceFilter);
+      if (t.sourceFormat === "qa-law-txt") {
+        const state = states[index];
+        if (!state.lawLabels || typeof state.lawLabels !== "object") state.lawLabels = {};
+        const labelNames = {0:"不相关", 1:"弱相关", 2:"强相关"};
+        $("evidenceList").innerHTML = filtered.map(e => {
+          const law = (t.lawItems || [])[e.originalIndex] || {};
+          const lawNo = String(law.index || e.originalIndex + 1);
+          const value = state.lawLabels[lawNo];
+          const labelHtml = (value === 0 || value === 1 || value === 2)
+            ? `<span class="evidence-manual-label" data-value="${value}">${value} · ${labelNames[value]}</span>`
+            : "";
+          return `<button class="evidence" data-evidence="${e.originalIndex}">
+            <span class="evidence-num">${law.index || e.originalIndex + 1}</span>
+            <span>
+              <b>${escapeHTML(law.articleName || e.name)}</b>
+              <small>${escapeHTML(law.lawName || "未填写法律名")}</small>
+            </span>
+            ${labelHtml}
+          </button>`;
+        }).join("") || `<p style="color:var(--muted)">当前分类暂无法条</p>`;
+        return;
+      }
+
+      $("evidenceList").innerHTML = filtered.map(e => `
+        <button class="evidence" data-evidence="${e.originalIndex}">
+          <span class="evidence-num">${e.originalIndex + 1}</span>
+          <span><b>${escapeHTML(e.name)}</b><small>${escapeHTML(e.type)} · ${escapeHTML(e.date)}</small></span>
+          <span class="status">${escapeHTML(e.status)}</span>
+        </button>`).join("") || `<p style="color:var(--muted)">当前分类暂无材料</p>`;
+    }
+
+    function renderAnalysis() {
+      const t = tasks[index];
+
+      if (t.sourceFormat === "fadawang-benchmark") {
+        const b = t.benchmark || {};
+        const norms = (b.gold_norms || []).map((norm, i) => `
+          <div class="law-card" id="law-card-${i}">
+            <div class="law-card-head">
+              <strong>${escapeHTML(norm.norm_name || "未命名规范")}</strong>
+              <span class="status-pill ${norm.verification_status === "dual_source_matched" ? "ok" : "warn"}">${escapeHTML(norm.verification_status || "待核验")}</span>
+            </div>
+            <h4 class="law-card-title">${escapeHTML(norm.provision_locator || "未定位")}</h4>
+            <p class="law-card-content">${escapeHTML(norm.full_text || "")}</p>
+            <p class="law-card-chapter">${escapeHTML(norm.validity || "")} · 第一来源：${escapeHTML(norm.source_url || "—")} · 第二来源：${escapeHTML(norm.secondary_source_url || "—")}</p>
+          </div>`).join("");
+
+        $("analysis").innerHTML = `
+          <section>
+            <h3>法答网原始问题</h3>
+            <div class="benchmark-source">${escapeHTML(b.source_question || "")}</div>
+            <h3>专家答复摘要</h3>
+            <p>${escapeHTML(b.source_answer_summary || "")}</p>
+          </section>
+          <section>
+            <h3>黄金答案</h3>
+            <div class="gold-answer">${escapeHTML((b.key_answer || [t.conclusion || ""]).join("；"))}</div>
+            <h3>Gold Path</h3>
+            ${(b.gold_path || t.analysis || []).map((step, i) => `<div class="reason-step" id="reason-${i}"><span class="step-no">${i+1}</span><p>${escapeHTML(step)}</p></div>`).join("")}
+          </section>
+          <section>
+            <h3>Gold Norms · ${(b.gold_norms || []).length}</h3>
+            <div class="law-cards">${norms}</div>
+          </section>
+          <section>
+            <h3>复核提示</h3>
+            <div class="risk"><strong>${escapeHTML(b.annotation_status || "draft")}</strong><span>${escapeHTML(t.risk || b.verification_notes || "")}</span></div>
+          </section>`;
+        return;
+      }
+
+      if (t.sourceFormat === "qa-law-txt") {
+        const state = states[index];
+        if (!state.lawLabels || typeof state.lawLabels !== "object") state.lawLabels = {};
+        const answerHtml = escapeHTML(t.answer || "").replace(/\n/g, "<br>");
+        const lawsHtml = (t.lawItems || []).map((law, i) => {
+          const lawNo = String(law.index || i + 1);
+          const selected = state.lawLabels[lawNo];
+          const labelButton = (value, text) =>
+            `<button type="button"
+              class="law-label-btn ${selected === value ? "selected" : ""}"
+              data-law-label="${lawNo}"
+              data-value="${value}"
+              aria-pressed="${selected === value ? "true" : "false"}">${value} ${text}</button>`;
+          return `<div class="law-card" id="law-card-${i}">
+            <div class="law-card-head">
+              <strong>法条 ${escapeHTML(law.index || i + 1)}</strong>
+              <div class="law-labeler" role="group" aria-label="法条 ${escapeHTML(law.index || i + 1)} 相关性标注">
+                <span class="law-labeler-title">相关性</span>
+                ${labelButton(0, "不相关")}
+                ${labelButton(1, "弱相关")}
+                ${labelButton(2, "强相关")}
+              </div>
+            </div>
+            <h4 class="law-card-title">${escapeHTML(law.lawName || "未填写法律名")} · ${escapeHTML(law.articleName || "未填写法条名")}</h4>
+            ${law.chapterName ? `<p class="law-card-chapter">${escapeHTML(law.chapterName)}</p>` : ""}
+            <p class="law-card-content">${escapeHTML(law.content || "未填写法条内容")}</p>
+          </div>`;
+        }).join("");
+
+        $("analysis").innerHTML = `
+          <section>
+            <h3>答案</h3>
+            <div class="qa-answer">${answerHtml}</div>
+          </section>
+          <section>
+            <h3>相关法条 · ${(t.lawItems || []).length} 条</h3>
+            <div class="law-cards">${lawsHtml}</div>
+          </section>`;
+        return;
+      }
+
+      $("analysis").innerHTML = `
+        <section>
+          <h3>争议焦点</h3>
+          <p>${t.issues.map((x,i) => `${i+1}. ${escapeHTML(x)}`).join("<br>")}</p>
+        </section>
+        <section>
+          <h3>法律依据</h3>
+          <div>${t.laws.map((law,i) => `<button class="law-chip" data-evidence="${Math.max(0, Math.min(i, t.evidence.length-1))}">${escapeHTML(law)}</button>`).join("")}</div>
+        </section>
+        <section>
+          <h3>论证过程</h3>
+          ${t.analysis.map((p,i) => `<div class="reason-step" id="reason-${i}"><span class="step-no">${i+1}</span><p>${escapeHTML(p)} <button class="e-ref" data-evidence="${Math.max(0, Math.min(i,t.evidence.length-1))}">证据 ${Math.max(0, Math.min(i,t.evidence.length-1))+1}</button></p></div>`).join("")}
+          <div class="risk"><strong>一致性提示</strong><span>${escapeHTML(t.risk)}</span></div>
+        </section>
+        <section>
+          <h3>模型结论</h3>
+          <p>${escapeHTML(t.conclusion)}</p>
+        </section>`;
+    }
+
+    function renderDimensions() {
+      const state = states[index];
+      $("dimensions").innerHTML = dimensionDefs.map(def => {
+        const value = state.scores[def.id];
+        return `<div class="dimension" data-dimension="${def.id}">
+          <div class="dimension-head"><b>${def.name}</b><span>${value ? `${value} 分` : "未评分"}</span></div>
+          <p>${def.hint}</p>
+          <div class="scale" role="group" aria-label="${def.name}；再次点击已选分数可取消">
+            ${[1,2,3,4,5].map(n => `<button type="button" aria-pressed="${value===n ? "true" : "false"}" class="${value===n ? "selected" : ""} ${n<3 ? "low" : ""}" data-score="${n}" data-key="${def.id}" title="${value===n ? "再次点击取消该评分" : `选择 ${n} 分`}">${n}</button>`).join("")}
+          </div>
+          <div class="validation ${value && value < 3 && !state.notes.trim() ? "show" : ""}">该项低于 3 分，请在总体评语中说明具体理由。</div>
+        </div>`;
+      }).join("");
+    }
+
+    function updateScoreSummary() {
+      const vals = Object.values(states[index].scores);
+      const avg = vals.length ? vals.reduce((a,b)=>a+b,0) / vals.length : 0;
+      $("averageScore").textContent = vals.length ? avg.toFixed(1) : "—";
+      $("scoreRing").style.setProperty("--score-angle", `${avg / 5 * 360}deg`);
+      const labels = avg >= 4.5 ? ["优秀","可进入黄金数据锁定候选"] :
+        avg >= 3.5 ? ["良好","建议复核风险项后进入 reviewed"] :
+        avg >= 2.5 ? ["待改进","需要修订论证或引用"] :
+        avg > 0 ? ["高风险","不建议进入黄金数据集"] : ["待完成评分","完成四个维度后生成综合评价"];
+      $("scoreLabel").textContent = labels[0];
+      $("scoreHelp").textContent = vals.length < 4 ? `已完成 ${vals.length}/4 个维度` : labels[1];
+    }
+
+    function updateSubmitState() {
+      const state = states[index];
+      const t = tasks[index];
+
+      if (t.sourceFormat === "fadawang-benchmark") {
+        const vals = Object.values(state.scores);
+        const complete = vals.length === 4;
+        const lowScoreNeedsReason = vals.some(v => v < 3) && !state.notes.trim();
+        const allAtLeast4 = complete && vals.every(v => Number(v) >= 4);
+        const aNamed = !!(state.reviewerA || "").trim();
+        const bNamed = !!(state.reviewerB || "").trim();
+        const distinctReviewers = aNamed && bNamed && state.reviewerA.trim() !== state.reviewerB.trim();
+        const aApproved = state.reviewAStatus === "approved";
+        const bApproved = state.reviewBStatus === "approved";
+        const hasDispute = state.reviewBStatus === "disagree" || state.reviewStatus === "disputed";
+        const disputeExplained = !hasDispute || !!(state.reviewBNote || "").trim();
+        const disputeResolved = !hasDispute || !!(state.resolutionNote || "").trim();
+        const noBlockingTags = !(state.tags || []).some(tag =>
+          ["引用漏项","条号错配","双源不一致","题面泄露","事实不足","黄金答案不完整"].includes(tag)
+        );
+        const lockOwnerPresent = !!(state.lockOwner || "").trim();
+
+        const gates = [
+          ["四个复核维度已完成且均 ≥ 4", allAtLeast4],
+          ["Reviewer A 已填写并通过", aNamed && aApproved],
+          ["Reviewer B 已填写并通过", bNamed && bApproved],
+          ["A / B 为不同复核人", distinctReviewers],
+          ["不存在未关闭的阻塞性问题标签", noBlockingTags],
+          ["分歧已说明并完成裁决", disputeExplained && disputeResolved],
+          ["锁定人已填写", lockOwnerPresent]
+        ];
+
+        if ($("gateChecklist")) {
+          $("gateChecklist").innerHTML = gates.map(([label, ok]) =>
+            `<div class="gate-item ${ok ? "pass" : ""}"><span class="gate-dot"></span><span>${escapeHTML(label)}</span></div>`
+          ).join("");
+        }
+
+        // 自动推导建议状态。只要评分不完整，任务必须回到 draft / 待标注，
+        // 防止“取消一项评分后仍显示审核中”。
+        let suggested = "draft";
+        if (complete) {
+          if (aNamed && state.reviewAStatus !== "pending") suggested = "review_a_done";
+          if (aNamed && bNamed && state.reviewBStatus !== "pending") suggested = "review_b_done";
+          if (state.reviewBStatus === "disagree") suggested = "disputed";
+        }
+        if (!complete) {
+          state.reviewStatus = "draft";
+          state.lockedAt = "";
+          if ($("reviewStatus")) $("reviewStatus").value = "draft";
+        } else if (state.reviewStatus !== "locked" && state.reviewStatus !== "disputed") {
+          state.reviewStatus = suggested;
+          if ($("reviewStatus")) $("reviewStatus").value = suggested;
+        }
+
+        const tryingToLock = (state.reviewStatus || "draft") === "locked";
+        const canLock = gates.every(([, ok]) => ok) && !hasDispute;
+
+        const hints = [];
+        if (!complete) hints.push(`请完成四个复核维度（${vals.length}/4）`);
+        if (lowScoreNeedsReason) hints.push("低于 3 分的维度必须说明原因");
+        if (!aNamed) hints.push("请填写 Reviewer A");
+        if (!bNamed) hints.push("请填写 Reviewer B");
+        if (aNamed && bNamed && !distinctReviewers) hints.push("Reviewer A / B 不能是同一人");
+        if (state.reviewBStatus === "disagree" && !(state.reviewBNote || "").trim()) hints.push("存在分歧时必须填写 B 的分歧说明");
+        if (hasDispute && !(state.resolutionNote || "").trim()) hints.push("disputed 状态必须填写裁决/关闭说明");
+        if (tryingToLock && !canLock) hints.push("尚未满足 locked 门禁");
+
+        $("submitBtn").disabled = !complete || lowScoreNeedsReason || !aNamed || (tryingToLock && !canLock);
+        $("noteValidation").textContent = hints.join("；");
+
+        if ($("reviewHint")) {
+          $("reviewHint").textContent = canLock
+            ? "已满足锁定门槛：可将状态设为 locked 并提交。"
+            : "尚未满足锁定门槛；请完成双人复核、关闭阻塞问题与分歧。";
+          $("reviewHint").classList.toggle("warn", !canLock);
+        }
+        if ($("gateBadge")) {
+          $("gateBadge").textContent = state.reviewStatus || "draft";
+          $("gateBadge").dataset.state = state.reviewStatus || "draft";
+        }
+
+        document.querySelectorAll(".validation").forEach(x => {
+          const key = x.closest(".dimension").dataset.dimension;
+          x.classList.toggle("show", state.scores[key] < 3 && !state.notes.trim());
+        });
+        return;
+      }
+
+      if (t.sourceFormat === "qa-law-txt") {
+        if (!state.lawLabels || typeof state.lawLabels !== "object") state.lawLabels = {};
+        const total = (t.lawItems || []).length;
+        const completeCount = (t.lawItems || []).reduce((n, law, i) => {
+          const value = state.lawLabels[String(law.index || i + 1)];
+          return n + ((value === 0 || value === 1 || value === 2) ? 1 : 0);
+        }, 0);
+        $("submitBtn").disabled = total === 0 || completeCount !== total;
+        $("noteValidation").textContent = completeCount !== total ? `请完成全部法条标注（${completeCount}/${total}）` : "";
+        document.querySelectorAll(".validation").forEach(x => x.classList.remove("show"));
+        return;
+      }
+
+      const vals = Object.values(state.scores);
+      const complete = vals.length === 4;
+      const needsReason = vals.some(v => v < 3) && !state.notes.trim();
+      $("submitBtn").disabled = !complete || needsReason;
+      $("noteValidation").textContent = needsReason ? "请说明低分原因" : "";
+      document.querySelectorAll(".validation").forEach(x => {
+        const key = x.closest(".dimension").dataset.dimension;
+        x.classList.toggle("show", state.scores[key] < 3 && !state.notes.trim());
+      });
+    }
+
+    function setTask(next) {
+      index = (next + tasks.length) % tasks.length;
+      evidenceFilter = "all";
+      document.querySelectorAll(".chip").forEach((c,i) => c.classList.toggle("active", i===0));
+      render();
+      window.scrollTo({top:0, behavior:"smooth"});
+    }
+
+    function highlightEvidence(evidenceIndex) {
+      const item = document.querySelector(`[data-evidence="${evidenceIndex}"].evidence`);
+      if (item) {
+        item.classList.add("active","flash");
+        setTimeout(() => item.classList.remove("flash"), 850);
+      }
+
+      if (tasks[index].sourceFormat === "qa-law-txt") {
+        const lawCard = $(`law-card-${evidenceIndex}`);
+        if (lawCard) {
+          lawCard.classList.add("flash");
+          lawCard.scrollIntoView({behavior:"smooth", block:"center"});
+          setTimeout(() => lawCard.classList.remove("flash"), 1000);
+        }
+        return;
+      }
+
+      if (item) item.scrollIntoView({behavior:"smooth", block:"center"});
+      const reason = $(`reason-${Math.min(evidenceIndex, tasks[index].analysis.length-1)}`);
+      if (reason) {
+        reason.classList.add("flash");
+        setTimeout(() => reason.classList.remove("flash"), 850);
+      }
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    function saveDraft(silent = false) {
+      try {
+        const payload = tasks.map((task, i) => ({
+          taskId: task.id,
+          state: states[i]
+        }));
+        localStorage.setItem("lexalign-demo-annotations-v2-qa-law", JSON.stringify(payload));
+        $("saveStatus").textContent = `草稿已保存 · ${new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}`;
+        if (!silent) showToast("草稿已保存");
+      } catch (_) {
+        if (!silent) showToast("当前浏览器不允许本地保存");
+      }
+    }
+
+    function downloadJSON(filename, data) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json;charset=utf-8"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 500);
+    }
+
+    document.addEventListener("click", e => {
+      const lawLabelBtn = e.target.closest("[data-law-label][data-value]");
+      if (lawLabelBtn) {
+        const t = tasks[index];
+        const state = states[index];
+        if (t.sourceFormat === "qa-law-txt") {
+          if (!state.lawLabels || typeof state.lawLabels !== "object") state.lawLabels = {};
+          const lawKey = String(lawLabelBtn.dataset.lawLabel);
+          const nextValue = Number(lawLabelBtn.dataset.value);
+          const previousValue = state.lawLabels[lawKey];
+          const isCancel = previousValue === nextValue;
+          // 再次点击当前已选标签 = 取消标注；点击其他标签 = 改选。
+          if (isCancel) {
+            delete state.lawLabels[lawKey];
+          } else {
+            state.lawLabels[lawKey] = nextValue;
+          }
+          // 标注内容被取消或改动后，旧审核结论不再有效，自动退回待标注。
+          if (isCancel || (previousValue !== undefined && previousValue !== nextValue)) {
+            reopenTaskForAnnotation(state, {
+              message: isCancel ? "已取消标注，任务已退回待标注" : "标注已改动，任务已退回待标注"
+            });
+          } else {
+            state.submitted = false;
+          }
+          render();
+          saveDraft(true);
+          if (window.refreshV17TaskPanel) window.refreshV17TaskPanel();
+        }
+        return;
+      }
+
+      const score = e.target.closest("[data-score]");
+      if (score) {
+        const state = states[index];
+        const key = score.dataset.key;
+        const nextValue = Number(score.dataset.score);
+        const previousValue = state.scores[key];
+        const isCancel = previousValue === nextValue;
+        // 再次点击当前已选分数 = 取消评分；点击其他分数 = 改选。
+        if (isCancel) {
+          delete state.scores[key];
+        } else {
+          state.scores[key] = nextValue;
+        }
+        // 取消/改动已有评分意味着标注版本发生变化：旧 A/B 通过状态失效，
+        // 自动回到 draft，在任务池中显示“待标注”。
+        if (isCancel || (previousValue !== undefined && previousValue !== nextValue)) {
+          reopenTaskForAnnotation(state, {
+            message: isCancel ? "已取消评分，任务已退回待标注" : "评分已改动，任务已退回待标注"
+          });
+        } else {
+          state.submitted = false;
+        }
+        renderDimensions(); updateScoreSummary(); updateSubmitState();
+        saveDraft(true);
+        if (window.refreshV17TaskPanel) window.refreshV17TaskPanel();
+        return;
+      }
+      const evidence = e.target.closest("[data-evidence]");
+      if (evidence) { highlightEvidence(Number(evidence.dataset.evidence)); return; }
+      const tag = e.target.closest("[data-tag]");
+      if (tag) {
+        const list = states[index].tags;
+        const value = tag.dataset.tag;
+        const pos = list.indexOf(value);
+        pos >= 0 ? list.splice(pos,1) : list.push(value);
+        tag.classList.toggle("active"); tag.classList.toggle("alert");
+      }
+    });
+
+    document.querySelector(".evidence-toolbar").addEventListener("click", e => {
+      const chip = e.target.closest("[data-filter]");
+      if (!chip) return;
+      evidenceFilter = chip.dataset.filter;
+      document.querySelectorAll("[data-filter]").forEach(c => c.classList.toggle("active", c===chip));
+      renderEvidence();
+    });
+
+    $("notes").addEventListener("input", e => {
+      states[index].notes = e.target.value;
+      $("noteCount").textContent = e.target.value.length;
+      updateSubmitState();
+    });
+    $("reviewStatus").addEventListener("change", e => {
+      const state = states[index];
+      const next = e.target.value;
+      state.reviewStatus = next;
+      if (next !== "locked") state.lockedAt = "";
+      state.submitted = false;
+      updateSubmitState();
+      saveDraft(true);
+    });
+
+    [
+      ["reviewerAName","reviewerA"],
+      ["reviewerBName","reviewerB"],
+      ["reviewAStatus","reviewAStatus"],
+      ["reviewBStatus","reviewBStatus"],
+      ["reviewANote","reviewANote"],
+      ["reviewBNote","reviewBNote"],
+      ["resolutionNote","resolutionNote"],
+      ["lockOwner","lockOwner"]
+    ].forEach(([id, key]) => {
+      const el = $(id);
+      const eventName = el.tagName === "SELECT" ? "change" : "input";
+      el.addEventListener(eventName, e => {
+        states[index][key] = e.target.value.trim ? e.target.value.trim() : e.target.value;
+        states[index].submitted = false;
+        updateSubmitState();
+      });
+    });
+    $("prevBtn").onclick = () => setTask(index - 1);
+    $("nextBtn").onclick = () => setTask(index + 1);
+    taskSelect.onchange = e => setTask(Number(e.target.value));
+    $("saveBtn").onclick = saveDraft;
+    $("submitBtn").onclick = () => {
+      if (states[index].reviewStatus === "locked" && !states[index].lockedAt && !$("submitBtn").disabled) {
+        states[index].lockedAt = new Date().toISOString();
+      }
+
+      states[index].submitted = true;
+      saveDraft();
+      showToast("标注已提交，正在进入下一条任务");
+      setTimeout(() => setTask(index + 1), 650);
+    };
+
+    $("exportBtn").onclick = () => {
+      const lines = tasks.map((task, i) => JSON.stringify(currentReviewPayload(task, states[i] || {})));
+      downloadTXT("法衡-Benchmark复核结果.jsonl", lines.join("\n"));
+      showToast(`已导出 ${lines.length} 条 JSONL`);
+    };
+
+    const benchmarkDialog = $("benchmarkDialog");
+
+    function currentReviewPayload(task, state) {
+      const base = task.sourceFormat === "fadawang-benchmark"
+        ? (task.benchmark?.rawRecord || {
+            task_id: task.id,
+            task_name: task.benchmark?.task_name || task.title,
+            query: task.facts,
+            domain: task.domain,
+            jurisdiction: task.jurisdiction,
+            as_of_date: task.benchmark?.as_of_date || "",
+            legal_relationship_labels: task.benchmark?.legal_relationship_labels || [],
+            issue_labels: task.benchmark?.issue_labels || [],
+            gold_norms: task.benchmark?.gold_norms || [],
+            key_answer: {mandatory: task.benchmark?.key_answer || [task.conclusion]},
+            gold_path: task.benchmark?.gold_path || task.analysis || [],
+            annotation_status: task.benchmark?.annotation_status || "draft"
+          })
+        : {task_id:task.id, task_name:task.title, query:task.facts, domain:task.domain};
+
+      return {
+        ...base,
+        human_review: {
+          workflow_version: "dual-review-gate-v1",
+          review_status: state.reviewStatus || "draft",
+          reviewer_a: {
+            name: state.reviewerA || "",
+            decision: state.reviewAStatus || "pending",
+            note: state.reviewANote || ""
+          },
+          reviewer_b: {
+            name: state.reviewerB || "",
+            decision: state.reviewBStatus || "pending",
+            note: state.reviewBNote || ""
+          },
+          dispute_resolution: state.resolutionNote || "",
+          lock_owner: state.lockOwner || "",
+          locked_at: state.reviewStatus === "locked" ? (state.lockedAt || new Date().toISOString()) : "",
+          scores: state.scores || {},
+          notes: state.notes || "",
+          issue_tags: state.tags || [],
+          submitted: !!state.submitted,
+          reviewed_at: new Date().toISOString()
+        }
+      };
+    }
+
+    function renderBenchmarkDialog() {
+      const t = tasks[index];
+      const state = states[index] || {};
+      const b = t.benchmark || {};
+      const isBenchmark = t.sourceFormat === "fadawang-benchmark";
+      const dual = isBenchmark ? (b.gold_norms || []).filter(n => n.verification_status === "dual_source_matched").length : 0;
+      const totalNorms = isBenchmark ? (b.gold_norms || []).length : (t.laws || []).length;
+      $("benchmarkOverview").innerHTML = [
+        ["Task ID", b.task_id || t.id],
+        ["数据类型", isBenchmark ? "法答网 Benchmark" : (t.sourceFormat === "qa-law-txt" ? "候选法条标注" : "质检语料")],
+        ["Gold Norms", totalNorms],
+        ["双源一致", isBenchmark ? `${dual}/${totalNorms}` : "—"],
+        ["审核状态", state.reviewStatus || b.annotation_status || "draft"]
+      ].map(([k,v]) => `<div class="benchmark-kpi"><span>${escapeHTML(k)}</span><b>${escapeHTML(v)}</b></div>`).join("");
+
+      if (!isBenchmark) {
+        $("benchmarkDetail").innerHTML = `<div class="benchmark-card"><h3>尚未映射到法答网 Benchmark Schema</h3><p>这条任务仍可用于一般法律质检；如要与 Week4 Benchmark 工程结合，请使用 JSON/JSONL 导入带 task_id、source_qa、gold_norms、verification 等字段的记录。</p></div>`;
+        return;
+      }
+
+      $("benchmarkDetail").innerHTML = `
+        <div class="benchmark-card">
+          <h3>Source QA</h3>
+          <p><b>第 ${escapeHTML(b.batch_number || "—")} 批</b> · 发布 ${escapeHTML(b.published_at || "—")} · As-of ${escapeHTML(b.as_of_date || "—")}</p>
+          <p>${escapeHTML(b.source_question || "")}</p>
+        </div>
+        <div class="benchmark-card">
+          <h3>Query → Gold Answer</h3>
+          <p>${escapeHTML(t.facts || "")}</p>
+          <div class="gold-answer">${escapeHTML((b.key_answer || [t.conclusion || ""]).join("；"))}</div>
+        </div>
+        <div class="benchmark-card">
+          <h3>Gold Norms / Verification</h3>
+          ${(b.gold_norms || []).map(n => `<span class="status-pill ${n.verification_status === "dual_source_matched" ? "ok" : "warn"}">${escapeHTML(n.provision_locator || n.norm_name || "规范")} · ${escapeHTML(n.verification_status || "待核验")}</span>`).join("")}
+        </div>
+        <div class="benchmark-card">
+          <h3>Human Review</h3>
+          <p>原记录 reviewers：${escapeHTML((b.reviewers || []).join("、") || "无")}。</p>
+          <p>Reviewer A：${escapeHTML(state.reviewerA || "未填写")} · ${escapeHTML(state.reviewAStatus || "pending")}；Reviewer B：${escapeHTML(state.reviewerB || "未填写")} · ${escapeHTML(state.reviewBStatus || "pending")}。</p>
+          <p>状态：<code>${escapeHTML(state.reviewStatus || "draft")}</code>；评分维度：${Object.keys(state.scores || {}).length}/4；锁定人：${escapeHTML(state.lockOwner || "—")}。</p>
+        </div>`;
+    }
+
+    $("benchmarkBtn").onclick = () => {
+      renderBenchmarkDialog();
+      benchmarkDialog.showModal();
+    };
+    $("closeBenchmarkDialog").onclick = () => benchmarkDialog.close();
+    benchmarkDialog.addEventListener("click", e => { if (e.target === benchmarkDialog) benchmarkDialog.close(); });
+
+    $("exportCurrentBenchmark").onclick = () => {
+      const payload = currentReviewPayload(tasks[index], states[index] || {});
+      downloadJSON(`法衡-${tasks[index].id}-复核结果.json`, payload);
+    };
+
+
+    const dialog = $("datasetDialog");
+    $("datasetBtn").onclick = () => dialog.showModal();
+    $("closeDialog").onclick = () => dialog.close();
+    $("downloadDataset").onclick = () => downloadJSON("法衡-法律Benchmark-当前数据集.json", {
+      meta:{name:"法衡法律 Benchmark 标注与复核数据", version:"v1.1", notice:"包含演示语料与法答网 Benchmark 示例；请以原始 JSONL 为机器事实源"},
+      dimensions:dimensionDefs, tasks
+    });
+    dialog.addEventListener("click", e => { if (e.target === dialog) dialog.close(); });
+
+    document.addEventListener("keydown", e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !$("submitBtn").disabled) $("submitBtn").click();
+      if (["INPUT","TEXTAREA","SELECT"].includes(document.activeElement.tagName)) return;
+      if (e.key.toLowerCase() === "j") setTask(index + 1);
+      if (e.key.toLowerCase() === "k") setTask(index - 1);
+    });
+
+    // ----- 语料管理：表单 / JSON 导入 / 管理 -----
+    const corpusDialog = $("corpusDialog");
+
+    function splitLines(text) {
+      return String(text || "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    }
+
+    function splitEvidence(text) {
+      // 每行：name | type | date | status
+      return splitLines(text).map(line => {
+        const parts = line.split("|").map(s => s.trim());
+        return {
+          name: parts[0] || "未命名证据",
+          type: parts[1] || "书证",
+          date: parts[2] || "",
+          status: parts[3] || "待核验"
+        };
+      });
+    }
+
+    function joinLines(arr) { return (arr || []).join("\n"); }
+    function joinEvidence(arr) {
+      return (arr || []).map(e => [e.name, e.type, e.date, e.status].join(" | ")).join("\n");
+    }
+
+    function readForm() {
+      return {
+        id: $("f_id").value.trim(),
+        domain: $("f_domain").value.trim(),
+        jurisdiction: $("f_jurisdiction").value.trim(),
+        difficulty: $("f_difficulty").value,
+        title: $("f_title").value.trim(),
+        parties: $("f_parties").value.trim(),
+        facts: $("f_facts").value.trim(),
+        issues: splitLines($("f_issues").value),
+        evidence: splitEvidence($("f_evidence").value),
+        laws: splitLines($("f_laws").value),
+        analysis: splitLines($("f_analysis").value),
+        risk: $("f_risk").value.trim(),
+        conclusion: $("f_conclusion").value.trim()
+      };
+    }
+
+    function writeForm(task) {
+      $("f_id").value = task.id || "";
+      $("f_domain").value = task.domain || "";
+      $("f_jurisdiction").value = task.jurisdiction || "";
+      $("f_difficulty").value = task.difficulty || "中";
+      $("f_title").value = task.title || "";
+      $("f_parties").value = task.parties || "";
+      $("f_facts").value = task.facts || "";
+      $("f_issues").value = joinLines(task.issues);
+      $("f_evidence").value = joinEvidence(task.evidence);
+      $("f_laws").value = joinLines(task.laws);
+      $("f_analysis").value = joinLines(task.analysis);
+      $("f_risk").value = task.risk || "";
+      $("f_conclusion").value = task.conclusion || "";
+    }
+
+    function resetForm() {
+      ["f_id","f_domain","f_jurisdiction","f_title","f_parties","f_facts","f_issues","f_evidence","f_laws","f_analysis","f_risk","f_conclusion"]
+        .forEach(id => { $(id).value = ""; });
+      $("f_difficulty").value = "中";
+      $("addTaskError").textContent = "";
+    }
+
+    function validateTask(t) {
+      const errs = [];
+      if (!t.id) errs.push("案件编号不能为空");
+      if (!/^[\w.\-:]+$/.test(t.id)) errs.push("案件编号仅允许字母、数字、点、横线、冒号");
+      if (!t.title) errs.push("标题不能为空");
+      if (!t.domain) errs.push("领域不能为空");
+      if (!t.jurisdiction) errs.push("法域不能为空");
+      if (!t.parties) errs.push("当事人不能为空");
+      if (!t.facts) errs.push("基本事实不能为空");
+      if (t.issues.length === 0) errs.push("至少填写一条核心审查问题");
+      if (t.evidence.length === 0) errs.push("至少填写一条证据材料");
+      if (t.laws.length === 0) errs.push("至少填写一条法律依据");
+      if (t.analysis.length === 0) errs.push("至少填写一段论证过程");
+      if (!t.risk) errs.push("一致性提示不能为空");
+      if (!t.conclusion) errs.push("模型结论不能为空");
+      const conflict = tasks.find(x => x.id === t.id);
+      if (conflict) errs.push(`案件编号「${t.id}」已存在（${conflict.title}）`);
+      return errs;
+    }
+
+    function updateCorpusStats() {
+      $("corpusStatBuiltIn").textContent = getActiveBuiltInTasks().length;
+      $("corpusStatCustom").textContent = customTasks.length;
+      $("corpusStatTotal").textContent = tasks.length;
+    }
+
+    function renderManageList() {
+      const list = $("manageList");
+      if (customTasks.length === 0) {
+        list.innerHTML = `<div class="corp-empty">本机还没有自定义语料。请到「表单添加」或「TXT 导入」标签页添加。</div>`;
+        return;
+      }
+      list.innerHTML = customTasks.map((t, i) => `
+        <div class="dataset-row corp-custom-row" data-idx="${i}">
+          <code>${escapeHTML(t.id)}</code>
+          <div>
+            <b>${escapeHTML(t.title)}</b>
+            <br><small>${escapeHTML(t.sourceFormat === "qa-law-txt" ? `${(t.lawItems || []).length} 条候选法条 · ${t.sourceFile || "TXT"}` : (t.sourceFormat === "fadawang-benchmark" ? `${(t.benchmark?.gold_norms || []).length} 条 Gold Norms · ${t.benchmark?.annotation_status || "draft"}` : t.parties))}</small>
+          </div>
+          <small style="display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap">
+            <span>${escapeHTML(t.domain)} · ${escapeHTML(t.difficulty)}</span>
+            <button type="button" class="ghost-btn" style="min-height:28px;padding:0 10px" data-edit="${i}">编辑</button>
+            <button type="button" class="ghost-btn" style="min-height:28px;padding:0 10px;color:var(--red);border-color:rgba(231,121,121,.55)" data-remove="${i}">删除</button>
+          </small>
+        </div>`).join("");
+    }
+
+    function getDeletedTaskCount() {
+      return deletedTaskIds.size + deletedCustomTasks.length;
+    }
+
+    function updateDeletedTaskUI() {
+      const count = getDeletedTaskCount();
+      const totalEl = $("deletedBuiltInCount");
+      if (totalEl) totalEl.textContent = String(count);
+      const quickCount = $("quickDeletedCount");
+      if (quickCount) quickCount.textContent = String(count);
+      const quickBtn = $("quickRestoreTaskBtn");
+      if (quickBtn) quickBtn.disabled = count === 0;
+    }
+
+    function renderDeletedTaskList() {
+      const list = $("deletedTaskList");
+      if (!list) return;
+
+      const rows = [];
+      Array.from(deletedTaskIds).forEach(id => {
+        const t = builtInTasks.find(x => String(x.id) === String(id));
+        rows.push({kind:"builtIn", id:String(id), title:t?.title || t?.question || "预装任务", type:"预装"});
+      });
+      deletedCustomTasks.forEach(t => {
+        rows.push({kind:"custom", id:String(t.id), title:t.title || t.question || "自定义任务", type:"自定义"});
+      });
+
+      if (!rows.length) {
+        list.innerHTML = `<div class="corp-empty">回收站为空。误删任务后会出现在这里。</div>`;
+        updateDeletedTaskUI();
+        return;
+      }
+
+      list.innerHTML = rows.map(row => `
+        <div class="dataset-row" style="grid-template-columns:minmax(150px,.8fr) minmax(220px,1.8fr) auto;align-items:center">
+          <code>${escapeHTML(row.id)}</code>
+          <div><b>${escapeHTML(row.title)}</b><br><small>${escapeHTML(row.type)}任务 · 恢复后重新进入待标注</small></div>
+          <button type="button" class="outline-btn" style="min-height:30px;padding:0 10px" data-restore-kind="${row.kind}" data-restore-id="${escapeHTML(row.id)}">恢复这一条</button>
+        </div>`).join("");
+      updateDeletedTaskUI();
+    }
+
+    function snapshotStatesByTaskId() {
+      const byId = new Map();
+      tasks.forEach((t, i) => byId.set(String(t.id), states[i] || makeBlankReviewState()));
+      return byId;
+    }
+
+    function rebuildActiveTasksPreservingStates(stateById, currentId) {
+      tasks.length = 0;
+      tasks.push(...getActiveBuiltInTasks(), ...customTasks);
+      states.length = 0;
+      tasks.forEach(t => states.push(stateById.get(String(t.id)) || makeBlankReviewState()));
+      const restoredCurrentIndex = tasks.findIndex(t => String(t.id) === String(currentId || ""));
+      index = restoredCurrentIndex >= 0 ? restoredCurrentIndex : Math.min(index, Math.max(0, tasks.length - 1));
+      refreshTaskWorkspaceAfterMutation();
+      renderDeletedTaskList();
+    }
+
+    function addCustomTask(task) {
+      task.__custom = true;
+      customTasks.push(task);
+      saveCustomTasks();
+      tasks.length = 0;
+      tasks.push(...getActiveBuiltInTasks(), ...customTasks);
+      syncStatesWithTasks();
+      renderTaskOptions();
+      updateMetrics();
+      updateCorpusStats();
+      renderManageList();
+      renderDatasetList();
+      render();
+      if (window.refreshV17TaskPanel) window.refreshV17TaskPanel();
+    }
+
+    function removeCustomTaskByIndex(localIdx) {
+      if (localIdx < 0 || localIdx >= customTasks.length) return;
+      const target = customTasks[localIdx];
+      const removedId = String(target.id);
+      const displayName = target.question || target.title || removedId;
+      if (!confirm(`确认删除这条自定义语料？\n\n${displayName}\n\n删除后会进入“误删任务回收站”，可随时恢复。`)) return;
+      closeCustomTaskEditor();
+
+      // 删除前保存当前任务状态映射；被删除任务的标注本身按设计移除。
+      const stateById = snapshotStatesByTaskId();
+      stateById.delete(removedId);
+      const currentId = tasks[index] ? String(tasks[index].id) : "";
+
+      const [removed] = customTasks.splice(localIdx, 1);
+      deletedCustomTasks = deletedCustomTasks.filter(t => String(t.id) !== removedId);
+      if (removed) deletedCustomTasks.push(removed);
+      saveCustomTasks();
+      saveDeletedCustomTasks();
+
+      rebuildActiveTasksPreservingStates(stateById, currentId === removedId ? "" : currentId);
+      showToast(`已删除「${removedId}」，可在回收站恢复`);
+    }
+
+
+    function makeBlankReviewState() {
+      return {
+        scores:{}, notes:"", tags:[], submitted:false, lawLabels:{},
+        reviewStatus:"draft",
+        reviewerA:"", reviewerB:"",
+        reviewAStatus:"pending", reviewBStatus:"pending",
+        reviewANote:"", reviewBNote:"",
+        resolutionNote:"", lockOwner:"", lockedAt:""
+      };
+    }
+
+    function refreshTaskWorkspaceAfterMutation(options = {}) {
+      if (tasks.length === 0) {
+        index = 0;
+        renderTaskOptions();
+        updateMetrics();
+        updateCorpusStats();
+        renderManageList();
+        renderDeletedTaskList();
+        renderDatasetList();
+        updateDeletedTaskUI();
+        if (window.refreshV17TaskPanel) window.refreshV17TaskPanel();
+        return;
+      }
+
+      if (index >= tasks.length) index = tasks.length - 1;
+      if (index < 0) index = 0;
+
+      renderTaskOptions();
+      updateMetrics();
+      updateCorpusStats();
+      renderManageList();
+      renderDeletedTaskList();
+      renderDatasetList();
+      render();
+      saveDraft(true);
+      updateDeletedTaskUI();
+      if (window.refreshV17TaskPanel) window.refreshV17TaskPanel();
+    }
+
+    function deleteCurrentTask() {
+      if (!tasks.length) {
+        showToast("当前没有可删除任务");
+        return;
+      }
+      if (tasks.length <= 1) {
+        showToast("工作台至少保留 1 条任务");
+        return;
+      }
+
+      const target = tasks[index];
+      const state = states[index] || {};
+      const targetId = String(target.id || "");
+      const title = target.title || target.question || targetId;
+      const isCustom = !!target.__custom ||
+        customTasks.some(t => String(t.id) === targetId);
+      const hasReview =
+        !!state.submitted ||
+        (state.reviewStatus && state.reviewStatus !== "draft") ||
+        Object.keys(state.scores || {}).length > 0 ||
+        String(state.notes || "").trim().length > 0;
+
+      let warning =
+        `确认删除当前任务？\n\n` +
+        `${targetId}\n${title}\n\n` +
+        `删除后，这条任务将不再出现在任务池、搜索结果和导出结果中。`;
+
+      if (hasReview) {
+        warning += `\n\n⚠ 这条任务已经有标注/审核内容，删除后本机工作台中的这些标注也会一并移除。`;
+      }
+
+      warning += isCustom
+        ? `\n\n这是自定义任务，删除后会进入“误删任务回收站”，可恢复。`
+        : `\n\n这是预装任务，删除后会进入“误删任务回收站”，可恢复。`;
+
+      if (!confirm(warning)) return;
+
+      if (isCustom) {
+        const customIndex = customTasks.findIndex(
+          t => String(t.id) === targetId
+        );
+        if (customIndex >= 0) {
+          const [removed] = customTasks.splice(customIndex, 1);
+          deletedCustomTasks = deletedCustomTasks.filter(t => String(t.id) !== targetId);
+          if (removed) deletedCustomTasks.push(removed);
+          saveCustomTasks();
+          saveDeletedCustomTasks();
+        }
+      } else {
+        deletedTaskIds.add(targetId);
+        saveDeletedTaskIds();
+      }
+
+      // 任务与标注必须同步删除，避免索引错位。任务本身进入回收站。
+      tasks.splice(index, 1);
+      states.splice(index, 1);
+
+      if (index >= tasks.length) index = tasks.length - 1;
+
+      refreshTaskWorkspaceAfterMutation();
+      showToast(`已删除「${targetId}」，可在回收站恢复`);
+    }
+
+    function restoreDeletedTask(kind, id) {
+      id = String(id || "");
+      if (!id) return;
+
+      const stateById = snapshotStatesByTaskId();
+      const currentId = tasks[index] ? String(tasks[index].id) : "";
+
+      if (kind === "builtIn") {
+        if (!deletedTaskIds.has(id)) {
+          showToast("这条预装任务已经不在回收站中");
+          return;
+        }
+        if (tasks.some(t => String(t.id) === id)) {
+          showToast(`无法恢复「${id}」：当前工作台已有同 ID 任务`);
+          return;
+        }
+        deletedTaskIds.delete(id);
+        saveDeletedTaskIds();
+      } else if (kind === "custom") {
+        const trashIndex = deletedCustomTasks.findIndex(t => String(t.id) === id);
+        if (trashIndex < 0) {
+          showToast("这条自定义任务已经不在回收站中");
+          return;
+        }
+        if (tasks.some(t => String(t.id) === id)) {
+          showToast(`无法恢复「${id}」：当前工作台已有同 ID 任务`);
+          return;
+        }
+        const [restored] = deletedCustomTasks.splice(trashIndex, 1);
+        restored.__custom = true;
+        customTasks.push(restored);
+        saveCustomTasks();
+        saveDeletedCustomTasks();
+      } else {
+        return;
+      }
+
+      rebuildActiveTasksPreservingStates(stateById, currentId);
+      showToast(`已恢复「${id}」，状态为待标注`);
+    }
+
+    function restoreDeletedBuiltInTasks() {
+      const total = getDeletedTaskCount();
+      if (total === 0) {
+        showToast("回收站为空，没有可恢复任务");
+        return;
+      }
+
+      if (!confirm(`确认恢复回收站中的 ${total} 条任务？\n\n恢复后会重新出现在任务池中，并从“待标注”开始；删除前移除的本地标注不会自动恢复。`)) {
+        return;
+      }
+
+      const stateById = snapshotStatesByTaskId();
+      const currentId = tasks[index] ? String(tasks[index].id) : "";
+
+      // 先恢复预装任务；若某个 ID 已被当前自定义任务占用，则留在回收站。
+      const occupiedByCustom = new Set(customTasks.map(t => String(t.id)));
+      for (const id of Array.from(deletedTaskIds)) {
+        if (!occupiedByCustom.has(String(id))) deletedTaskIds.delete(String(id));
+      }
+      saveDeletedTaskIds();
+
+      const activeIds = new Set([
+        ...getActiveBuiltInTasks().map(t => String(t.id)),
+        ...customTasks.map(t => String(t.id))
+      ]);
+      const stillDeletedCustom = [];
+      let restoredCustomCount = 0;
+      for (const t of deletedCustomTasks) {
+        const id = String(t.id);
+        if (activeIds.has(id)) {
+          stillDeletedCustom.push(t);
+          continue;
+        }
+        t.__custom = true;
+        customTasks.push(t);
+        activeIds.add(id);
+        restoredCustomCount++;
+      }
+      deletedCustomTasks = stillDeletedCustom;
+      saveCustomTasks();
+      saveDeletedCustomTasks();
+
+      rebuildActiveTasksPreservingStates(stateById, currentId);
+      const remaining = getDeletedTaskCount();
+      if (remaining) {
+        showToast(`已恢复大部分任务；${remaining} 条因 ID 冲突仍留在回收站`);
+      } else {
+        showToast(`已恢复 ${total} 条任务，均回到待标注`);
+      }
+    }
+
+    function openDeletedTaskRecovery() {
+      if (getDeletedTaskCount() === 0) {
+        showToast("回收站为空，没有误删任务");
+        return;
+      }
+      openCorpusDialog("manage");
+      renderDeletedTaskList();
+      setTimeout(() => {
+        const target = $("deletedTaskList");
+        if (target) target.scrollIntoView({behavior:"smooth", block:"center"});
+      }, 80);
+    }
+
+    let editingCustomIndex = null;
+
+    function closeCustomTaskEditor() {
+      editingCustomIndex = null;
+      const panel = $("manageEditor");
+      if (panel) panel.style.display = "none";
+      if ($("manageEditorRaw")) $("manageEditorRaw").value = "";
+      if ($("manageEditorError")) $("manageEditorError").textContent = "";
+    }
+
+    function openCustomTaskEditor(localIdx) {
+      if (localIdx < 0 || localIdx >= customTasks.length) return;
+      const t = customTasks[localIdx];
+      editingCustomIndex = localIdx;
+      $("manageEditorError").textContent = "";
+      $("manageEditorTitle").textContent = `编辑语料 · ${t.id}`;
+      $("manageEditorRaw").value = taskToTxt(t);
+      $("manageEditor").style.display = "block";
+      $("manageEditorRaw").focus();
+      $("manageEditor").scrollIntoView({behavior:"smooth", block:"nearest"});
+    }
+
+    function rebuildTasksAfterCorpusChange() {
+      saveCustomTasks();
+      tasks.length = 0;
+      tasks.push(...getActiveBuiltInTasks(), ...customTasks);
+      syncStatesWithTasks();
+      renderTaskOptions();
+      updateMetrics();
+      updateCorpusStats();
+      renderManageList();
+      renderDatasetList();
+      render();
+      saveDraft();
+    }
+
+    function saveCustomTaskEdit() {
+      if (editingCustomIndex === null || editingCustomIndex < 0 || editingCustomIndex >= customTasks.length) {
+        $("manageEditorError").textContent = "没有正在编辑的语料";
+        return;
+      }
+
+      const raw = $("manageEditorRaw").value.trim();
+      if (!raw) {
+        $("manageEditorError").textContent = "TXT 内容不能为空";
+        return;
+      }
+
+      try {
+        const old = customTasks[editingCustomIndex];
+        const parsed = old.sourceFormat === "fadawang-benchmark"
+          ? benchmarkRecordToTask(
+              parseJsonRecords(raw)[0],
+              old.sourceFile || `edited-${editingCustomIndex + 1}.json`,
+              0
+            )
+          : parseTxtTask(
+              raw,
+              old.sourceFile || `edited-${editingCustomIndex + 1}.txt`,
+              0
+            );
+
+        const builtInConflict = builtInTasks.some(t => t.id === parsed.id);
+        const customConflict = customTasks.some((t, i) =>
+          i !== editingCustomIndex && (
+            t.id === parsed.id ||
+            (t.sourceFormat === "qa-law-txt" &&
+             parsed.sourceFormat === "qa-law-txt" &&
+             String(t.question || "").trim() === String(parsed.question || "").trim())
+          )
+        );
+
+        if (builtInConflict || customConflict) {
+          throw new Error("修改后的语料与现有语料重复，请检查问题内容");
+        }
+
+        parsed.__custom = true;
+        customTasks[editingCustomIndex] = parsed;
+        rebuildTasksAfterCorpusChange();
+        closeCustomTaskEditor();
+        showToast("语料修改已保存");
+      } catch (err) {
+        $("manageEditorError").textContent = `保存失败：${err.message || err}`;
+      }
+    }
+
+    function renderDatasetList() {
+      const list = $("datasetList");
+      if (!list) return;
+      list.innerHTML = tasks.map(t => `<div class="dataset-row">
+        <code>${escapeHTML(t.id)}</code>
+        <div>
+          <b>${escapeHTML(t.title)}</b>
+          <br><small>${escapeHTML(t.sourceFormat === "qa-law-txt" ? `${(t.lawItems || []).length} 条候选法条 · ${t.sourceFile || "TXT"}` : (t.sourceFormat === "fadawang-benchmark" ? `${(t.benchmark?.gold_norms || []).length} 条 Gold Norms · ${t.benchmark?.annotation_status || "draft"}` : t.parties))}</small>
+        </div>
+        <small>${escapeHTML(t.jurisdiction)} · ${escapeHTML(t.difficulty)}</small>
+      </div>`).join("");
+    }
+
+    function updateMetrics() {
+      $("metricCount").textContent = tasks.length;
+      $("metricEvidence").textContent = tasks.reduce((n,t) => n + (t.evidence || []).length, 0);
+      if ($("metricDomains")) $("metricDomains").textContent = new Set(tasks.map(t => t.domain).filter(Boolean)).size;
+    }
+
+    function switchCorpusTab(tab) {
+      document.querySelectorAll(".corp-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+      document.querySelectorAll(".corp-tab-panel").forEach(p => p.classList.toggle("active", p.dataset.panel === tab));
+      if (tab === "manage") {
+        renderManageList();
+        renderDeletedTaskList();
+      } else closeCustomTaskEditor();
+    }
+
+    function openCorpusDialog(tab) {
+      switchCorpusTab(tab || "form");
+      updateCorpusStats();
+      $("addTaskError").textContent = "";
+      $("importTaskError").textContent = "";
+      corpusDialog.showModal();
+    }
+
+    function closeCorpusDialog() { corpusDialog.close(); }
+
+    function handleAddTaskSubmit(e) {
+      e.preventDefault();
+      $("addTaskError").textContent = "";
+      const t = readForm();
+      const errs = validateTask(t);
+      if (errs.length) { $("addTaskError").textContent = errs.join("；"); return; }
+      addCustomTask(t);
+      resetForm();
+      showToast(`已加入「${t.id}」·共 ${tasks.length} 条语料`);
+    }
+
+    // ----- TXT 导入 -----
+    const TXT_FIELD_ALIASES = {
+      id: ["案件编号","编号","id"],
+      title: ["标题","案件标题","任务标题","title"],
+      domain: ["领域","业务领域","domain"],
+      jurisdiction: ["法域","司法辖区","jurisdiction"],
+      difficulty: ["难度","difficulty"],
+      parties: ["当事人","主体","parties"],
+      facts: ["基本事实","案件事实","事实","facts"],
+      issues: ["核心审查问题","审查问题","争议焦点","issues"],
+      evidence: ["证据材料","证据","evidence"],
+      laws: ["法律依据","法律规则","规则依据","laws"],
+      analysis: ["论证过程","模型分析","法律分析","分析","analysis"],
+      risk: ["一致性提示","风险提示","审查提示","risk"],
+      conclusion: ["模型结论","结论","conclusion"]
+    };
+
+    const TXT_ALIAS_TO_KEY = (() => {
+      const map = {};
+      Object.entries(TXT_FIELD_ALIASES).forEach(([key, aliases]) => {
+        aliases.forEach(alias => { map[String(alias).trim().toLowerCase()] = key; });
+      });
+      return map;
+    })();
+
+    function txtFieldKey(label) {
+      return TXT_ALIAS_TO_KEY[String(label || "").trim().toLowerCase()] || null;
+    }
+
+    function cleanTxtListLine(line) {
+      return String(line || "")
+        .replace(/^\s*(?:[-*•·]|(?:\d+)[.)、]|[（(]?\d+[）)])\s*/, "")
+        .trim();
+    }
+
+    function splitTxtList(value) {
+      const text = String(value || "").trim();
+      if (!text) return [];
+      let lines = text.split(/\n+/).map(cleanTxtListLine).filter(Boolean);
+      if (lines.length === 1 && /[；;]/.test(lines[0])) {
+        lines = lines[0].split(/[；;]/).map(cleanTxtListLine).filter(Boolean);
+      }
+      return lines;
+    }
+
+    function splitTxtAnalysis(value) {
+      const text = String(value || "").trim();
+      if (!text) return [];
+      const paragraphs = text.split(/\n\s*\n+/).map(s => s.trim()).filter(Boolean);
+      if (paragraphs.length > 1) return paragraphs;
+      return splitTxtList(text);
+    }
+
+    function parseTxtEvidence(value, fileName) {
+      const lines = splitTxtList(value);
+      if (!lines.length) {
+        return [{
+          name: `原始 TXT 文件：${fileName}`,
+          type: "电子数据",
+          date: "",
+          status: "待核验"
+        }];
+      }
+      return lines.map(line => {
+        const parts = line.split(/\s*[|｜]\s*/);
+        return {
+          name: parts[0] || "未命名证据",
+          type: parts[1] || "书证",
+          date: parts[2] || "",
+          status: parts[3] || "待核验"
+        };
+      });
+    }
+
+    function makeTxtTaskId(fileName, ordinal) {
+      const stamp = Date.now().toString(36).toUpperCase();
+      return `TXT-${stamp}-${String(ordinal + 1).padStart(2, "0")}`;
+    }
+
+    function parseTxtSections(raw) {
+      const fields = {};
+      let currentKey = null;
+      const lines = String(raw || "")
+        .replace(/^\uFEFF/, "")
+        .replace(/\r\n?/g, "\n")
+        .split("\n");
+
+      for (const rawLine of lines) {
+        const trimmed = rawLine.trim();
+        let label = null;
+        let inlineValue = "";
+
+        let match = trimmed.match(/^[【\[]([^】\]]+)[】\]]\s*[:：]?\s*(.*)$/);
+        if (match) {
+          label = match[1];
+          inlineValue = match[2] || "";
+        } else {
+          match = trimmed.match(/^([^:：]{1,24})\s*[:：]\s*(.*)$/);
+          if (match) {
+            label = match[1];
+            inlineValue = match[2] || "";
+          }
+        }
+
+        const key = label ? txtFieldKey(label) : null;
+        if (key) {
+          currentKey = key;
+          if (!(key in fields)) fields[key] = "";
+          if (inlineValue) fields[key] += (fields[key] ? "\n" : "") + inlineValue;
+          continue;
+        }
+
+        if (currentKey) {
+          fields[currentKey] += (fields[currentKey] ? "\n" : "") + rawLine;
+        }
+      }
+
+      Object.keys(fields).forEach(k => { fields[k] = fields[k].trim(); });
+      return fields;
+    }
+
+    function normalizeTask(task) {
+      const t = task && typeof task === "object" ? task : {};
+      const asText = value => value == null ? "" : String(value).trim();
+      const asTextList = value => {
+        if (Array.isArray(value)) return value.map(asText).filter(Boolean);
+        return asText(value) ? [asText(value)] : [];
+      };
+      const asEvidence = value => {
+        const list = Array.isArray(value) ? value : [];
+        return list.map((item, i) => {
+          if (item && typeof item === "object") {
+            return {
+              name: asText(item.name) || `证据材料 ${i + 1}`,
+              type: asText(item.type) || "书证",
+              date: asText(item.date),
+              status: asText(item.status) || "待核验"
+            };
+          }
+          return {
+            name: asText(item) || `证据材料 ${i + 1}`,
+            type: "书证",
+            date: "",
+            status: "待核验"
+          };
+        }).filter(item => item.name);
+      };
+
+      const normalized = {
+        id: asText(t.id),
+        domain: asText(t.domain) || "法律问答",
+        jurisdiction: asText(t.jurisdiction) || "未填写",
+        difficulty: ["高", "中", "低"].includes(asText(t.difficulty)) ? asText(t.difficulty) : "中",
+        title: asText(t.title) || "TXT 导入任务",
+        parties: asText(t.parties) || "问答数据",
+        facts: asText(t.facts),
+        issues: asTextList(t.issues),
+        evidence: asEvidence(t.evidence),
+        laws: asTextList(t.laws),
+        analysis: asTextList(t.analysis),
+        risk: asText(t.risk),
+        conclusion: asText(t.conclusion)
+      };
+
+      if (t.sourceFormat === "qa-law-txt") {
+        normalized.sourceFormat = "qa-law-txt";
+        normalized.sourceFile = asText(t.sourceFile);
+        normalized.question = asText(t.question);
+        normalized.answer = asText(t.answer);
+        normalized.lawItems = Array.isArray(t.lawItems) ? t.lawItems.map((law, i) => ({
+          index: Number(law.index) || i + 1,
+          lawName: asText(law.lawName),
+          chapterName: asText(law.chapterName),
+          articleName: asText(law.articleName),
+          content: asText(law.content),
+          label: law.label === 0 || law.label === "0" ? 0 :
+                 law.label === 1 || law.label === "1" ? 1 :
+                 law.label === 2 || law.label === "2" ? 2 : null
+        })) : [];
+      }
+      return normalized;
+    }
+
+    function stableTxtTaskId(fileName, question, ordinal) {
+      const input = `${fileName || ""}\n${question || ""}\n${ordinal || 0}`;
+      let h = 2166136261;
+      for (let i = 0; i < input.length; i++) {
+        h ^= input.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return `QA-${(h >>> 0).toString(16).toUpperCase().padStart(8, "0")}`;
+    }
+
+    function splitTxtTasks(raw) {
+      const normalized = String(raw || "")
+        .replace(/^\uFEFF/, "")
+        .replace(/\r\n?/g, "\n")
+        .trim();
+      if (!normalized) return [];
+
+      // 当前数据集以 **问题**: 开始。支持一个 TXT 中连续放多组问答。
+      const starts = [];
+      const re = /^\s*\*\*问题\*\*\s*[:：]\s*/gm;
+      let match;
+      while ((match = re.exec(normalized)) !== null) starts.push(match.index);
+
+      if (!starts.length) return [normalized];
+      return starts.map((start, i) => {
+        const end = i + 1 < starts.length ? starts[i + 1] : normalized.length;
+        return normalized.slice(start, end).trim();
+      }).filter(Boolean);
+    }
+
+    function decodePythonSingleQuoted(value) {
+      const s = String(value || "");
+      if (s === "None") return "";
+      if (!(s.startsWith("'") && s.endsWith("'"))) return s.trim();
+      const body = s.slice(1, -1);
+      let out = "";
+      for (let i = 0; i < body.length; i++) {
+        const ch = body[i];
+        if (ch !== "\\") {
+          out += ch;
+          continue;
+        }
+        const next = body[++i];
+        if (next === undefined) { out += "\\"; break; }
+        if (next === "n") out += "\n";
+        else if (next === "r") out += "\r";
+        else if (next === "t") out += "\t";
+        else if (next === "'") out += "'";
+        else if (next === "\\") out += "\\";
+        else out += next;
+      }
+      return out;
+    }
+
+    function parsePythonDictLiteral(raw) {
+      const text = String(raw || "").trim();
+      const obj = {};
+      const pairRe = /'((?:\\.|[^'\\])+)'\s*:\s*(None|'(?:\\.|[^'\\])*')/g;
+      let m;
+      while ((m = pairRe.exec(text)) !== null) {
+        const key = decodePythonSingleQuoted(`'${m[1]}'`);
+        obj[key] = decodePythonSingleQuoted(m[2]);
+      }
+      return obj;
+    }
+
+    function extractSection(text, startLabel, endLabel) {
+      const startRe = new RegExp(`\\*\\*${startLabel}\\*\\*\\s*[:：]`, "i");
+      const start = startRe.exec(text);
+      if (!start) return "";
+      const from = start.index + start[0].length;
+      if (!endLabel) return text.slice(from).trim();
+      const tail = text.slice(from);
+      const endRe = new RegExp(`^\\s*\\*\\*${endLabel}\\*\\*\\s*[:：]`, "mi");
+      const end = endRe.exec(tail);
+      return (end ? tail.slice(0, end.index) : tail).trim();
+    }
+
+    function parseLawItems(lawSection) {
+      const text = String(lawSection || "").replace(/\r\n?/g, "\n");
+      const headers = [];
+      const headerRe = /^\s*\*\*法条(\d+)\*\*\s*[:：]\s*$/gm;
+      let m;
+      while ((m = headerRe.exec(text)) !== null) {
+        headers.push({index: Number(m[1]), start: m.index, bodyStart: headerRe.lastIndex});
+      }
+
+      return headers.map((h, idx) => {
+        const end = idx + 1 < headers.length ? headers[idx + 1].start : text.length;
+        const block = text.slice(h.bodyStart, end).trim();
+
+        const labelRe = new RegExp(`\\[对于法条${h.index}，你的标注\\]\\s*[:：]\\s*([012])`);
+        const labelMatch = block.match(labelRe);
+        const beforeLabel = labelMatch ? block.slice(0, labelMatch.index).trim() : block;
+        const dictStart = beforeLabel.indexOf("{");
+        const dictEnd = beforeLabel.lastIndexOf("}");
+        if (dictStart < 0 || dictEnd < dictStart) {
+          throw new Error(`法条${h.index} 未找到可解析的法条对象`);
+        }
+
+        const obj = parsePythonDictLiteral(beforeLabel.slice(dictStart, dictEnd + 1));
+        if (!obj["法律名"] && !obj["法条名"] && !obj["法条内容"]) {
+          throw new Error(`法条${h.index} 的法律名/法条名/法条内容无法解析`);
+        }
+
+        return {
+          index: h.index,
+          lawName: obj["法律名"] || "",
+          chapterName: obj["章节名"] || "",
+          articleName: obj["法条名"] || "",
+          content: obj["法条内容"] || "",
+          label: labelMatch ? Number(labelMatch[1]) : null
+        };
+      });
+    }
+
+    function parseTxtTask(raw, fileName, ordinal) {
+      const text = String(raw || "").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").trim();
+      if (!text) throw new Error("TXT 内容为空");
+
+      const question = extractSection(text, "问题", "答案");
+      const answer = extractSection(text, "答案", "相关法条");
+      const lawSection = extractSection(text, "相关法条", null);
+
+      if (!question) throw new Error("未找到 **问题**:");
+      if (!answer) throw new Error("未找到 **答案**:");
+      if (!lawSection) throw new Error("未找到 **相关法条**:");
+
+      const lawItems = parseLawItems(lawSection);
+      if (!lawItems.length) throw new Error("未找到 **法条1**、**法条2** 等法条块");
+
+      const baseName = String(fileName || "TXT").replace(/\.txt$/i, "");
+      const labelCounts = {0:0, 1:0, 2:0};
+      lawItems.forEach(item => {
+        if (item.label === 0 || item.label === 1 || item.label === 2) labelCounts[item.label]++;
+      });
+
+      const task = normalizeTask({
+        sourceFormat: "qa-law-txt",
+        sourceFile: fileName || "",
+        question,
+        answer,
+        lawItems,
+        id: stableTxtTaskId(fileName, question, ordinal),
+        title: question,
+        domain: "法律问答",
+        jurisdiction: baseName || "未填写",
+        difficulty: "中",
+        parties: "问答数据",
+        facts: question,
+        issues: [question],
+        evidence: lawItems.map(item => ({
+          name: `法条${item.index} · ${item.articleName || item.lawName || "未命名法条"}`,
+          type: "规则文本",
+          date: "",
+          status: "待在线标注"
+        })),
+        laws: lawItems.map(item =>
+          `法条${item.index} · ${item.lawName || "未填写法律名"} · ${item.articleName || "未填写法条名"}`
+        ),
+        analysis: [answer],
+        risk: `候选法条 ${lawItems.length} 条；在线相关性标注规则：0=不相关，1=弱相关，2=强相关`,
+        conclusion: answer
+      });
+
+      task.sourceFormat = "qa-law-txt";
+      task.sourceFile = fileName || "";
+      task.question = question;
+      task.answer = answer;
+      task.lawItems = lawItems;
+      return task;
+    }
+
+
+    function parseJsonRecords(raw) {
+      const text = String(raw || "").replace(/^\uFEFF/, "").trim();
+      if (!text) return [];
+      try {
+        const parsed = JSON.parse(text);
+        return Array.isArray(parsed) ? parsed : [parsed];
+      } catch (_) {
+        return text.split(/\r?\n/).map(s => s.trim()).filter(Boolean).map((line, i) => {
+          try { return JSON.parse(line); }
+          catch (err) { throw new Error(`JSONL 第 ${i + 1} 行不是合法 JSON`); }
+        });
+      }
+    }
+
+    function benchmarkRecordToTask(record, fileName, ordinal) {
+      const r = record && typeof record === "object" ? record : {};
+      if (!r.task_id || !r.query) throw new Error("缺少 task_id 或 query，无法按法答网 Benchmark 导入");
+      const b = {
+        task_id: String(r.task_id),
+        task_name: String(r.task_name || r.task_id),
+        batch_number: r.source_qa?.batch_number ?? "",
+        as_of_date: String(r.as_of_date || ""),
+        annotation_status: String(r.annotation_status || "draft"),
+        legal_relationship_labels: Array.isArray(r.legal_relationship_labels) ? r.legal_relationship_labels : [],
+        issue_labels: Array.isArray(r.issue_labels) ? r.issue_labels : [],
+        source_question: String(r.source_qa?.question || ""),
+        source_answer_summary: String(r.source_qa?.answer_summary || ""),
+        source_answer_text: String(r.source_qa?.answer_text || ""),
+        answer_url: String(r.source_qa?.answer_url || ""),
+        published_at: String(r.source_qa?.published_at || ""),
+        key_middle: Array.isArray(r.key_middle) ? r.key_middle : [],
+        key_answer: Array.isArray(r.key_answer?.mandatory) ? r.key_answer.mandatory : [],
+        gold_path: Array.isArray(r.gold_path) ? r.gold_path : [],
+        reviewers: Array.isArray(r.verification?.reviewers) ? r.verification.reviewers : [],
+        verification_notes: String(r.verification?.notes || ""),
+        gold_norms: Array.isArray(r.gold_norms) ? r.gold_norms : (Array.isArray(r.gold_laws) ? r.gold_laws.map(n => ({
+          norm_name:n.norm_name || n.law_name || "未命名规范",
+          norm_type:n.norm_type || "法律规范",
+          provision_locator:n.provision_locator || n.article_number || "未定位",
+          verified_locator:n.verified_locator || n.provision_locator || n.article_number || "",
+          full_text:n.full_text || n.source_text || "",
+          validity:n.validity || "",
+          relevance:n.relevance || "",
+          source_url:n.source_url || "",
+          source_locator:n.source_locator || "",
+          secondary_source_url:n.secondary_source_url || "",
+          secondary_source_locator:n.secondary_source_locator || "",
+          verification_status:n.verification_status || (n.source_url && n.secondary_source_url ? "legacy_sources_present" : "legacy_unverified"),
+          verified_at:n.verified_at || r.as_of_date || "",
+          norm_status_notes:n.norm_status_notes || "",
+          mandatory:n.mandatory !== false
+        })) : []),
+        rawRecord: r
+      };
+      const norms = b.gold_norms;
+      const difficultyMap = {easy:"低", medium:"中", hard:"高"};
+      return {
+        sourceFormat:"fadawang-benchmark",
+        sourceFile:fileName || "",
+        id:b.task_id,
+        domain:String(r.domain || "法律 Benchmark"),
+        jurisdiction:String(r.jurisdiction || "中华人民共和国大陆地区"),
+        difficulty:difficultyMap[String(r.difficulty_level || "").toLowerCase()] || "中",
+        title:`法答网 Benchmark · ${b.task_name}`,
+        parties:"法答网精选答问 / Benchmark",
+        facts:String(r.query || ""),
+        issues:[...b.legal_relationship_labels, ...b.issue_labels],
+        evidence:norms.map((n, i) => ({
+          name:`${n.norm_name || "规范"} ${n.provision_locator || ""}`.trim(),
+          type:"规则文本",
+          date:String(n.verified_at || r.as_of_date || ""),
+          status:n.verification_status === "dual_source_matched" ? "双源一致" : String(n.verification_status || "待核验")
+        })),
+        laws:norms.map(n => `${n.norm_name || ""} ${n.provision_locator || ""}`.trim()),
+        analysis:b.gold_path,
+        risk:b.verification_notes || `annotation_status=${b.annotation_status}；reviewers=${b.reviewers.length}`,
+        conclusion:b.key_answer.join("；") || b.source_answer_summary,
+        benchmark:b,
+        __custom:true
+      };
+    }
+
+    function readTxtFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = ev => resolve(String(ev.target.result || ""));
+        reader.onerror = () => reject(new Error(`文件「${file.name}」读取失败`));
+        reader.readAsText(file, "utf-8");
+      });
+    }
+
+    async function handleTxtImport(e) {
+      e.preventDefault();
+      $("importTaskError").textContent = "";
+      const files = Array.from($("importTxtFiles").files || []);
+      if (!files.length) {
+        $("importTaskError").textContent = "请选择至少一个 TXT / JSON / JSONL 文件";
+        return;
+      }
+
+      let valid = 0, skipped = 0, errors = [];
+      let globalOrdinal = 0;
+
+      for (const file of files) {
+        try {
+          const raw = await readTxtFile(file);
+          const isJson = /\.(jsonl?|JSONL?)$/i.test(file.name);
+          const candidates = isJson
+            ? parseJsonRecords(raw).map(record => ({kind:"benchmark", record}))
+            : splitTxtTasks(raw).map(chunk => ({kind:"txt", chunk}));
+
+          if (!candidates.length) throw new Error("文件内容为空");
+
+          for (let i = 0; i < candidates.length; i++) {
+            try {
+              const item = candidates[i];
+              const t = item.kind === "benchmark"
+                ? benchmarkRecordToTask(item.record, file.name, globalOrdinal++)
+                : parseTxtTask(item.chunk, file.name, globalOrdinal++);
+
+              if (!t.id) throw new Error("任务编号为空");
+              if (t.sourceFormat === "fadawang-benchmark") {
+                if (!t.facts) throw new Error("query 为空");
+                if (!t.benchmark?.gold_norms?.length) throw new Error("gold_norms 为空");
+              } else if (t.sourceFormat === "qa-law-txt") {
+                if (!t.question) throw new Error("问题为空");
+                if (!t.answer) throw new Error("答案为空");
+                if (!Array.isArray(t.lawItems) || !t.lawItems.length) throw new Error("相关法条为空");
+              }
+
+              if (tasks.find(x => x.id === t.id) || customTasks.find(x => x.id === t.id)) {
+                skipped++;
+                continue;
+              }
+              t.__custom = true;
+              customTasks.push(t);
+              valid++;
+            } catch (err) {
+              errors.push(`${file.name} 第 ${i + 1} 条：${err.message}`);
+            }
+          }
+        } catch (err) {
+          errors.push(err.message || `${file.name} 读取失败`);
+        }
+      }
+
+      saveCustomTasks();
+      tasks.length = 0;
+      tasks.push(...getActiveBuiltInTasks(), ...customTasks);
+      syncStatesWithTasks();
+      renderTaskOptions();
+      updateMetrics();
+      updateCorpusStats();
+      renderManageList();
+      renderDatasetList();
+      $("importStatValid").textContent = valid;
+      $("importStatSkipped").textContent = skipped;
+      $("importStatCustom").textContent = customTasks.length;
+      $("importTxtFiles").value = "";
+      $("importTxtPreview").value = "";
+      render();
+
+      if (errors.length) $("importTaskError").textContent = `部分条目未导入：${errors.join("；")}`;
+      if (valid) showToast(`已导入 ${valid} 条语料${skipped ? `，跳过 ${skipped} 条重复` : ""}`);
+      else if (!errors.length) showToast("无新语料可导入");
+    }
+
+    async function handleTxtFileSelect(e) {
+      const files = Array.from(e.target.files || []);
+      $("importTaskError").textContent = "";
+      $("importStatValid").textContent = files.length;
+      $("importStatSkipped").textContent = 0;
+      $("importStatCustom").textContent = customTasks.length;
+
+      if (!files.length) {
+        $("importTxtPreview").value = "";
+        return;
+      }
+
+      try {
+        const raw = await readTxtFile(files[0]);
+        const suffix = files.length > 1 ? `\n\n……另已选择 ${files.length - 1} 个文件` : "";
+        $("importTxtPreview").value = raw.slice(0, 6000) + (raw.length > 6000 ? "\n\n……（预览已截断）" : "") + suffix;
+      } catch (err) {
+        $("importTaskError").textContent = err.message;
+      }
+    }
+
+    function downloadTXT(filename, text) {
+      const blob = new Blob([text], {type:"text/plain;charset=utf-8"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 500);
+    }
+
+    function pythonReprString(value) {
+      if (value === null || value === undefined || value === "") return "None";
+      return `'${String(value)
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/\r/g, "\\r")
+        .replace(/\n/g, "\\n")
+        .replace(/\t/g, "\\t")}'`;
+    }
+
+    function qaTaskToTxt(task) {
+      const laws = (task.lawItems || []).map((law, i) => {
+        const n = law.index || i + 1;
+        const dict = `{` +
+          `'法律名': ${pythonReprString(law.lawName)}, ` +
+          `'章节名': ${pythonReprString(law.chapterName)}, ` +
+          `'法条名': ${pythonReprString(law.articleName)}, ` +
+          `'法条内容': ${pythonReprString(law.content)}` +
+          `}`;
+        const labelLine = law.label === null || law.label === undefined
+          ? ""
+          : `\n\n[对于法条${n}，你的标注]：${law.label}`;
+        return `**法条${n}**:\n${dict}${labelLine}\n\n--------------------------------`;
+      }).join("\n\n");
+
+      return `**问题**:\n${task.question || task.facts || ""}\n\n\n**答案**:\n${task.answer || task.conclusion || ""}\n\n\n**相关法条**:\n\n${laws}`;
+    }
+
+    function taskToTxt(task) {
+      if (task.sourceFormat === "fadawang-benchmark") return JSON.stringify(task.benchmark?.rawRecord || {
+        task_id: task.id,
+        task_name: task.benchmark?.task_name || task.title,
+        query: task.facts,
+        domain: task.domain,
+        jurisdiction: task.jurisdiction,
+        as_of_date: task.benchmark?.as_of_date || "",
+        legal_relationship_labels: task.benchmark?.legal_relationship_labels || [],
+        issue_labels: task.benchmark?.issue_labels || [],
+        gold_norms: task.benchmark?.gold_norms || [],
+        key_answer: {mandatory: task.benchmark?.key_answer || [task.conclusion]},
+        gold_path: task.benchmark?.gold_path || task.analysis || [],
+        annotation_status: task.benchmark?.annotation_status || "draft"
+      }, null, 2);
+      if (task.sourceFormat === "qa-law-txt") return qaTaskToTxt(task);
+
+      const evidence = (task.evidence || []).map(e =>
+        `- ${e.name || ""} | ${e.type || ""} | ${e.date || ""} | ${e.status || ""}`
+      ).join("\n");
+      const bullets = arr => (arr || []).map(x => `- ${x}`).join("\n");
+      const analysis = (task.analysis || []).map((x, i) => `${i + 1}. ${x}`).join("\n");
+
+      return [
+        `案件编号：${task.id || ""}`,
+        `标题：${task.title || ""}`,
+        `领域：${task.domain || ""}`,
+        `法域：${task.jurisdiction || ""}`,
+        `难度：${task.difficulty || "中"}`,
+        `当事人：${task.parties || ""}`,
+        "",
+        "【基本事实】",
+        task.facts || "",
+        "",
+        "【核心审查问题】",
+        bullets(task.issues),
+        "",
+        "【证据材料】",
+        evidence,
+        "",
+        "【法律依据】",
+        bullets(task.laws),
+        "",
+        "【论证过程】",
+        analysis,
+        "",
+        "【一致性提示】",
+        task.risk || "",
+        "",
+        "【模型结论】",
+        task.conclusion || ""
+      ].join("\n");
+    }
+
+    function handleExportCustom() {
+      if (customTasks.length === 0) { showToast("尚无自定义语料可导出"); return; }
+      const hasBenchmark = customTasks.some(t => t.sourceFormat === "fadawang-benchmark");
+      if (hasBenchmark) {
+        const content = customTasks.map((task, i) => {
+          if (task.sourceFormat === "fadawang-benchmark") {
+            return JSON.stringify(task.benchmark?.rawRecord || currentReviewPayload(task, states[builtInTasks.length + i] || {}));
+          }
+          return JSON.stringify({
+            task_id: task.id,
+            task_name: task.title,
+            query: task.facts,
+            domain: task.domain,
+            source_format: task.sourceFormat || "custom",
+            raw_text: taskToTxt(task)
+          });
+        }).join("\n");
+        downloadTXT("法衡-自定义语料.jsonl", content);
+      } else {
+        const content = customTasks
+          .map(({__custom, ...rest}) => taskToTxt(rest))
+          .join("\n\n\n");
+        downloadTXT("法衡-自定义语料.txt", content);
+      }
+    }
+
+    function handleResetCustom() {
+      if (customTasks.length === 0) { showToast("没有可清空的自定义语料"); return; }
+      if (!confirm(`确认清空全部 ${customTasks.length} 条自定义语料？此操作不可恢复。`)) return;
+      customTasks.length = 0;
+      saveCustomTasks();
+      tasks.length = 0;
+      tasks.push(...getActiveBuiltInTasks(), ...customTasks);
+      // 只保留内置条目的标注
+      states.length = 0;
+      states.push(...getActiveBuiltInTasks().map(() => ({scores:{}, notes:"", tags:[], submitted:false, lawLabels:{}, reviewStatus:"draft", reviewerA:"", reviewerB:"", reviewAStatus:"pending", reviewBStatus:"pending", reviewANote:"", reviewBNote:"", resolutionNote:"", lockOwner:"", lockedAt:""})));
+      if (index >= states.length) index = Math.max(0, states.length - 1);
+      renderTaskOptions();
+      updateMetrics();
+      updateCorpusStats();
+      renderManageList();
+      renderDatasetList();
+      render();
+      saveDraft();
+      showToast("已清空全部自定义语料");
+    }
+
+    function init() {
+      // 顶栏：语料管理入口
+      $("addTaskBtn").onclick = () => openCorpusDialog("form");
+      $("importTaskBtn").onclick = () => openCorpusDialog("txt");
+      $("deleteCurrentTaskBtn").onclick = deleteCurrentTask;
+      $("quickRestoreTaskBtn").onclick = openDeletedTaskRecovery;
+
+      // 语料对话框：标签页 / 关闭
+      document.querySelectorAll(".corp-tab").forEach(btn => {
+        btn.addEventListener("click", () => switchCorpusTab(btn.dataset.tab));
+      });
+      $("closeCorpusDialog").onclick = closeCorpusDialog;
+      $("closeManageBtn").onclick = closeCorpusDialog;
+      corpusDialog.addEventListener("click", e => { if (e.target === corpusDialog) closeCorpusDialog(); });
+
+      // 表单：提交 / 重置
+      $("addTaskForm").addEventListener("submit", handleAddTaskSubmit);
+      $("addTaskReset").onclick = () => { resetForm(); };
+
+      // TXT 导入
+      $("importTaskForm").addEventListener("submit", handleTxtImport);
+      $("importTxtFiles").addEventListener("change", handleTxtFileSelect);
+      $("importTxtClear").onclick = () => {
+        $("importTxtFiles").value = "";
+        $("importTxtPreview").value = "";
+        $("importTaskError").textContent = "";
+        $("importStatValid").textContent = 0;
+        $("importStatSkipped").textContent = 0;
+        $("importStatCustom").textContent = customTasks.length;
+      };
+
+      // 管理列表：编辑 / 删除 + 维护按钮
+      $("manageList").addEventListener("click", e => {
+        const editBtn = e.target.closest("[data-edit]");
+        if (editBtn) {
+          openCustomTaskEditor(Number(editBtn.dataset.edit));
+          return;
+        }
+        const removeBtn = e.target.closest("[data-remove]");
+        if (removeBtn) {
+          removeCustomTaskByIndex(Number(removeBtn.dataset.remove));
+        }
+      });
+      $("deletedTaskList").addEventListener("click", e => {
+        const btn = e.target.closest("[data-restore-kind][data-restore-id]");
+        if (!btn) return;
+        restoreDeletedTask(btn.dataset.restoreKind, btn.dataset.restoreId);
+      });
+      $("manageEditorCancel").onclick = closeCustomTaskEditor;
+      $("manageEditorSave").onclick = saveCustomTaskEdit;
+      $("exportCustomBtn").onclick = handleExportCustom;
+      $("resetCustomBtn").onclick = handleResetCustom;
+      $("restoreDeletedBtn").onclick = restoreDeletedBuiltInTasks;
+
+      renderTaskOptions();
+      try {
+        const saved = JSON.parse(localStorage.getItem("lexalign-demo-annotations-v2-qa-law") || "null");
+        if (Array.isArray(saved)) {
+          const keyed = saved.some(item => item && typeof item === "object" && "taskId" in item && "state" in item);
+          if (keyed) {
+            const byId = new Map(saved.filter(x => x && x.taskId).map(x => [String(x.taskId), x.state || {}]));
+            tasks.forEach((task, i) => {
+              const recovered = byId.get(String(task.id));
+              if (recovered) Object.assign(states[i], recovered);
+              if (!states[i].lawLabels || typeof states[i].lawLabels !== "object") states[i].lawLabels = {};
+              if (!states[i].reviewStatus) states[i].reviewStatus = "draft";
+              if (typeof states[i].reviewerA !== "string") states[i].reviewerA = states[i].reviewer || "";
+              if (typeof states[i].reviewerB !== "string") states[i].reviewerB = "";
+              if (typeof states[i].reviewAStatus !== "string") states[i].reviewAStatus = "pending";
+              if (typeof states[i].reviewBStatus !== "string") states[i].reviewBStatus = "pending";
+              if (typeof states[i].reviewANote !== "string") states[i].reviewANote = "";
+              if (typeof states[i].reviewBNote !== "string") states[i].reviewBNote = "";
+              if (typeof states[i].resolutionNote !== "string") states[i].resolutionNote = "";
+              if (typeof states[i].lockOwner !== "string") states[i].lockOwner = "";
+              if (typeof states[i].lockedAt !== "string") states[i].lockedAt = "";
+            });
+          } else {
+            for (let i = 0; i < Math.min(saved.length, states.length); i++) {
+              if (saved[i]) Object.assign(states[i], saved[i]);
+              if (!states[i].lawLabels || typeof states[i].lawLabels !== "object") states[i].lawLabels = {};
+              if (!states[i].reviewStatus) states[i].reviewStatus = "draft";
+              if (typeof states[i].reviewerA !== "string") states[i].reviewerA = states[i].reviewer || "";
+              if (typeof states[i].reviewerB !== "string") states[i].reviewerB = "";
+              if (typeof states[i].reviewAStatus !== "string") states[i].reviewAStatus = "pending";
+              if (typeof states[i].reviewBStatus !== "string") states[i].reviewBStatus = "pending";
+              if (typeof states[i].reviewANote !== "string") states[i].reviewANote = "";
+              if (typeof states[i].reviewBNote !== "string") states[i].reviewBNote = "";
+              if (typeof states[i].resolutionNote !== "string") states[i].resolutionNote = "";
+              if (typeof states[i].lockOwner !== "string") states[i].lockOwner = "";
+              if (typeof states[i].lockedAt !== "string") states[i].lockedAt = "";
+            }
+          }
+        }
+      } catch (_) {}
+      updateMetrics();
+      renderDatasetList();
+      render();
+      renderManageList();
+      renderDeletedTaskList();
+      updateDeletedTaskUI();
+      if (window.refreshV17TaskPanel) window.refreshV17TaskPanel();
+    }
+    init();
+  </script>
+
+
+<style>
+/* v1.7 annotation workspace */
+.platform-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:18px 0}
+.platform-card{background:#10191a;border:1px solid #283637;border-radius:12px;padding:14px}
+.platform-card b{font-size:24px;color:#43dda0;display:block;margin-top:6px}
+.workspace-title{margin:24px 0 10px;font-size:20px}
+.annotation-grid{display:grid;grid-template-columns:260px 1fr;gap:16px}
+.task-panel,.review-panel{background:#10191a;border:1px solid #283637;border-radius:12px;padding:14px}
+.task-search{width:100%;padding:10px;border-radius:8px;border:1px solid #3a4b4c;background:#081011;color:white}
+.task-chip{padding:10px;margin-top:8px;border-radius:8px;background:#152021;cursor:pointer}
+.task-chip:hover{border:1px solid #43dda0}
+.task-chip.active{border:1px solid #43dda0;background:#18302b}
+#v17-list{max-height:560px;overflow-y:auto;padding-right:4px}
+#v17-list .task-chip b{word-break:break-all}
+#v17-list .task-title{display:block;margin-top:4px;color:#c8d3d4;font-size:12px;line-height:1.45}
+.badge{display:inline-block;padding:3px 8px;border-radius:99px;background:#152021;margin:2px;font-size:12px}
+.workflow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.step{padding:8px 12px;border-radius:8px;background:#152021}
+</style>
+
+<div id="v17-dashboard">
+<h2 class="workspace-title">Benchmark 标注工作台（v2.3 · 取消标注自动退回待标注）</h2>
+<div class="platform-bar">
+<div class="platform-card">任务总数<b id="v17-total">170</b></div>
+<div class="platform-card">待标注<b id="v17-todo">-</b></div>
+<div class="platform-card">审核中<b id="v17-review">-</b></div>
+<div class="platform-card">分歧<b id="v17-dispute">-</b></div>
+<div class="platform-card">已完成<b id="v17-done">-</b></div>
+</div>
+
+<div class="annotation-grid">
+<div class="task-panel">
+<h3>任务池</h3>
+<input class="task-search" id="v17-search" placeholder="搜索任务ID / 标题 / 领域 / 关键词">
+<div id="v17-search-meta" style="margin:8px 0;color:#91a4a6;font-size:12px"></div>
+<div id="v17-list"></div>
+</div>
+
+<div class="review-panel">
+<h3>标注流程</h3>
+<div class="workflow">
+<div class="step">① 查看题目</div>
+<div class="step">② 标注问题</div>
+<div class="step">③ Reviewer A</div>
+<div class="step">④ Reviewer B</div>
+<div class="step">⑤ Gold锁定</div>
+</div>
+<p>说明：原有审核区域保留，新增任务管理、进度统计和工作流入口。</p>
+</div>
+</div>
+</div>
+
+<script>
+(function(){
+  function getMainTasks(){
+    try{
+      if (typeof tasks !== "undefined" && Array.isArray(tasks) && tasks.length) return tasks;
+    }catch(_){}
+    if (Array.isArray(window.__BENCHMARK_POOL__) && window.__BENCHMARK_POOL__.length) {
+      return window.__BENCHMARK_POOL__;
+    }
+    return [];
+  }
+
+  function taskId(x){
+    return String((x && (x.id || x.task_id || x.benchmark?.task_id)) || "");
+  }
+
+  function taskSearchText(x){
+    const parts = [
+      taskId(x),
+      x?.title,
+      x?.domain,
+      x?.jurisdiction,
+      x?.facts,
+      ...(Array.isArray(x?.issues) ? x.issues : []),
+      x?.benchmark?.task_name,
+      x?.benchmark?.source_question,
+      x?.benchmark?.source_answer_summary
+    ];
+    return parts
+      .filter(v => v !== undefined && v !== null)
+      .join(" ")
+      .toLowerCase();
+  }
+
+  function compact(s){
+    return String(s || "")
+      .toLowerCase()
+      .replace(/[\s\-_–—/\\.:：]+/g,"");
+  }
+
+  function safe(value){
+    return String(value ?? "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  function reviewLabel(i){
+    try{
+      const s = (typeof states !== "undefined" && Array.isArray(states)) ? states[i] : null;
+      const task = (typeof tasks !== "undefined" && Array.isArray(tasks)) ? tasks[i] : null;
+      if (!s || !task) return "待标注";
+
+      // 标注完整性优先于审核状态：只要有一项评分/法条标签被取消，
+      // 即使之前做过 A/B 审核，也必须先回到“待标注”。
+      if (typeof isAnnotationComplete === "function" && !isAnnotationComplete(task, s)) {
+        return "待标注";
+      }
+
+      if (s.reviewStatus === "locked") return "已锁定";
+      if (
+        s.reviewStatus === "disputed" ||
+        s.reviewBStatus === "disagree" ||
+        s.everDisputed
+      ) return "分歧";
+      if (
+        (s.reviewAStatus && s.reviewAStatus !== "pending") ||
+        (s.reviewBStatus && s.reviewBStatus !== "pending")
+      ) return "审核中";
+      if (s.submitted) return "已提交";
+      return "待标注";
+    }catch(_){
+      return "待标注";
+    }
+  }
+
+  function initV17(){
+    const list = document.getElementById("v17-list");
+    const search = document.getElementById("v17-search");
+    const meta = document.getElementById("v17-search-meta");
+    if (!list || !search) return;
+
+    function render(){
+      const data = getMainTasks();
+      const raw = String(search.value || "").trim();
+      const q = raw.toLowerCase();
+      const qc = compact(raw);
+
+      const matched = data
+        .map((x, i) => ({
+          x,
+          i,
+          id: taskId(x),
+          text: taskSearchText(x)
+        }))
+        .filter(row => {
+          if (!q) return true;
+          return row.text.includes(q) || compact(row.text).includes(qc);
+        });
+
+      list.innerHTML = "";
+
+      if (meta) {
+        meta.textContent = raw
+          ? `找到 ${matched.length} 条；点击结果可直接打开该任务`
+          : `共 ${data.length} 条任务；支持任务 ID、标题、领域和关键词检索`;
+      }
+
+      if (!matched.length) {
+        list.innerHTML =
+          '<div style="padding:18px 6px;color:#91a4a6">' +
+          '没有匹配任务。可尝试输入 FDW-2026-0001、0001、工伤、合同等。' +
+          '</div>';
+      }
+
+      matched.forEach(row => {
+        const d = document.createElement("div");
+        d.className = "task-chip";
+        d.dataset.taskIndex = String(row.i);
+
+        const title = String(
+          row.x?.title ||
+          row.x?.benchmark?.task_name ||
+          ""
+        );
+
+        d.innerHTML =
+          '<b>' + safe(row.id || ("task-" + (row.i + 1))) + '</b>' +
+          (title
+            ? '<span class="task-title">' + safe(title) + '</span>'
+            : '') +
+          '<span class="badge">' + safe(reviewLabel(row.i)) + '</span>';
+
+        d.addEventListener("click", function(){
+          const current = getMainTasks();
+          const targetId = row.id;
+
+          let targetIndex = current.findIndex(
+            t => taskId(t) === targetId
+          );
+          if (targetIndex < 0) targetIndex = row.i;
+
+          try{
+            if (typeof setTask === "function") {
+              setTask(targetIndex);
+            } else {
+              const sel = document.getElementById("taskSelect");
+              if (sel) {
+                sel.value = String(targetIndex);
+                sel.dispatchEvent(
+                  new Event("change", {bubbles:true})
+                );
+              }
+            }
+          }catch(err){
+            console.error("打开任务失败", err);
+          }
+
+          list.querySelectorAll(".task-chip")
+            .forEach(el => el.classList.remove("active"));
+          d.classList.add("active");
+
+          const anchor = document.getElementById("taskSelect");
+          if (anchor) {
+            anchor.scrollIntoView({
+              behavior:"smooth",
+              block:"center"
+            });
+          }
+        });
+
+        list.appendChild(d);
+      });
+
+      const total = data.length;
+      let todo = 0, reviewing = 0, dispute = 0, done = 0;
+
+      for (let i = 0; i < total; i++) {
+        const label = reviewLabel(i);
+        if (label === "已锁定") done++;
+        else if (label === "分歧") dispute++;
+        else if (label === "审核中" || label === "已提交") reviewing++;
+        else todo++;
+      }
+
+      const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(value);
+      };
+
+      setText("v17-total", total);
+      setText("v17-todo", todo);
+      setText("v17-review", reviewing);
+      setText("v17-dispute", dispute);
+      setText("v17-done", done);
+    }
+
+    search.addEventListener("input", render);
+
+    search.addEventListener("keydown", function(e){
+      if (e.key === "Enter") {
+        const first = list.querySelector(".task-chip");
+        if (first) first.click();
+      }
+
+      if (e.key === "Escape") {
+        search.value = "";
+        render();
+      }
+    });
+
+    window.refreshV17TaskPanel = render;
+    render();
+  }
+
+  if (document.readyState === "complete") initV17();
+  else window.addEventListener("load", initV17);
+})();
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded",()=> {
+ const n=document.createElement("div");
+ n.textContent="v2.3：取消或改动评分后自动退回“待标注”，并新增误删任务回收站入口";
+ n.style.cssText="position:fixed;right:20px;top:70px;background:#152021;color:#43dda0;padding:8px 14px;border-radius:8px;z-index:9999;font-size:12px";
+ document.body.appendChild(n);
+ setTimeout(()=>n.remove(),3500);
+});
+</script></body>
+</html>

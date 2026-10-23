@@ -1,0 +1,28 @@
+{
+  "version": "v1.6",
+  "purpose": "将 week5 + week6 内容直接预装进双人复核系统，打开即可标注",
+  "week5_records_found": 169,
+  "week6_records_found": 170,
+  "unique_tasks_preloaded": 170,
+  "task_prefix_counts": {
+    "FDW": 169,
+    "RMSF": 1
+  },
+  "duplicate_task_ids_seen": 169,
+  "dedupe_rule": "同 task_id 只保留一条；week5/week6 重复时优先采用 week6 版本，同时保留来源批次信息",
+  "id_repairs": [
+    {
+      "source": "week6-王子康、伍旋航、林陈阳/001_RMSF-2026-0001_银行卡帮助行为罪名识别/02_数据构造与标注/03_样例数据/benchmark_sample.jsonl",
+      "old_task_id": "FDW-2026-0001",
+      "new_task_id": "RMSF-2026-0001",
+      "reason": "文件夹任务ID与记录内部task_id冲突，按文件夹中的RMSF任务ID修正"
+    }
+  ],
+  "annotation_mode": {
+    "preloaded": true,
+    "manual_json_import_required": false,
+    "initial_review_state": "draft",
+    "draft_storage": "browser localStorage",
+    "export": "页面内导出 JSONL"
+  }
+}
